@@ -60,3 +60,36 @@ Registro paso a paso de lo que se construyó. Las decisiones técnicas important
   2. La página muestra `Firebase inicializado ✔ – proyecto: pruebatecnica-2002c`.
   3. En la consola del navegador (F12) aparece `[main] Firebase inicializado pruebatecnica-2002c`, sin errores.
 - **Pendientes o dudas:** se eligió la versión 12.19.0 del SDK en lugar de la 13.0.0 (ver DECISIONES.md, que se crea en el sub-paso de documentación). Próximo paso: login.
+
+---
+
+## 2026-10-14 – Fase 1 – Paso: login con email y contraseña
+
+- **Qué hicimos:** construimos el login atravesando las tres capas: la pantalla captura los datos, el servicio aplica las reglas (perfil existente y usuario activo) y traduce los errores, y los repositorios hablan con Firebase Auth y Firestore. Agregamos un router por hash que protege las pantallas privadas y una pantalla de inicio provisoria con el nombre y el rol.
+- **Archivos creados o modificados:**
+  - `src/data/authRepositorio.js`: envuelve las llamadas a Firebase Auth (autenticar, desautenticar, escuchar la sesión).
+  - `src/data/usuariosRepositorio.js`: `obtenerUsuarioPorId(uid)` lee el perfil en `usuarios/{uid}`.
+  - `src/services/authServicio.js`: iniciar y cerrar sesión, cargar el perfil, rechazar usuarios sin perfil o inactivos, mensajes de error en español.
+  - `src/services/errores.js`: clase `ErrorAplicacion` (error con mensaje listo para mostrar).
+  - `src/ui/router.js`: decide la pantalla según el hash (`#/login`, `#/inicio`) y redirige si no hay sesión.
+  - `src/ui/pantallas/loginPantalla.js`: formulario de login.
+  - `src/ui/pantallas/inicioPantalla.js`: bienvenida provisoria con nombre, rol, email, área y botón de cerrar sesión.
+  - `src/ui/utils/html.js`: `escaparHtml()` para insertar datos de Firestore en el HTML sin riesgo de XSS.
+  - `src/styles/main.css`: estilos base con variables CSS.
+  - `src/main.js`: registra las rutas y reacciona a los cambios de sesión.
+  - `index.html`: enlaza los estilos y un favicon vacío (evita un error 404 en consola).
+- **Conceptos aprendidos:**
+  - **Autenticación vs. autorización:** Firebase Auth confirma *quién sos* (email y contraseña). Qué podés hacer lo define tu perfil en Firestore (rol, activo) y lo hacen cumplir las reglas.
+  - **`onAuthStateChanged`:** Firebase avisa cada vez que cambia la sesión, también al recargar la página, porque recuerda la sesión en el navegador.
+  - **Router por hash / SPA:** cambiar lo que está después del `#` no recarga la página. Así una sola página HTML muestra distintas pantallas.
+  - **XSS (Cross-Site Scripting):** si un dato con HTML se inserta sin escapar, el navegador lo ejecuta. Por eso los datos de Firestore pasan por `escaparHtml()` y los mensajes de error se ponen con `textContent`.
+  - **Condición de carrera:** dos procesos que terminan en un orden inesperado. El cierre de sesión de un usuario inactivo redibujaba el login y borraba el mensaje de error; el router ahora no redibuja la pantalla que ya está mostrando.
+- **Comandos usados:**
+  - `git add .`, `git commit -m "..."` y `git push`: guardar y subir el sub-paso anterior.
+  - `npx serve -l 5599 .`: servidor estático temporal para probar el login.
+- **Cómo probarlo:**
+  1. Levantá la app con Live Server. Sin sesión, la URL pasa sola a `#/login`.
+  2. Tocá **Ingresar** con los campos vacíos → "Ingresá tu email y tu contraseña."
+  3. Probá con un email y una contraseña inventados → "Email o contraseña incorrectos."
+  4. El ingreso correcto se prueba después del script de datos de prueba y las reglas (próximos pasos).
+- **Pendientes o dudas:** el login exitoso todavía no se puede probar: faltan los usuarios de prueba y las reglas que permiten leer el perfil.
