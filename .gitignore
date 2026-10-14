@@ -23,6 +23,9 @@ ui-debug.log
 # Configuración local de Vercel CLI
 .vercel/
 
+# Capturas y logs de las pruebas automáticas con navegador (Playwright)
+.playwright-mcp/
+
 # Configuración personal del editor (se comparte solo la lista de extensiones recomendadas)
 .vscode/*
 !.vscode/extensions.json
