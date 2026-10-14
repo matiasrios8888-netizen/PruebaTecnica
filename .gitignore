@@ -1,0 +1,32 @@
+# =============================================================
+# .gitignore – Archivos que NUNCA deben subirse al repositorio
+# =============================================================
+
+# 🔒 SEGURIDAD: claves privadas de Firebase (cuenta de servicio).
+# Con este archivo cualquiera tendría acceso total a la base de datos.
+serviceAccountKey.json
+*-firebase-adminsdk-*.json
+
+# Variables de entorno y secretos locales
+.env
+.env.*
+
+# Dependencias de Node (se reinstalan con "npm install")
+node_modules/
+
+# Archivos temporales y logs de Firebase CLI
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Configuración local de Vercel CLI
+.vercel/
+
+# Configuración personal del editor (se comparte solo la lista de extensiones recomendadas)
+.vscode/*
+!.vscode/extensions.json
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
