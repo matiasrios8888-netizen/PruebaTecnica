@@ -204,7 +204,17 @@ service cloud.firestore {
                 'solicitanteId', 'solicitanteNombre', 'supervisorId',
                 'etapaActual', 'estadoActual', 'asignadoA', 'asignadoNombre', 'rolAsignado',
                 'vistaPorAsignado', 'participantes', 'cantidadAdjuntos', 'cantidadNotas',
-                'ultimoEventoId', 'fechaCreacion', 'fechaActualizacion'];
+                'ultimoEventoId', 'referenciaRh', 'diasDescontados',
+                'fechaCreacion', 'fechaActualizacion'];
+      }
+
+      // ⚠️ IMPORTANTE (MATRIZ_CAMPOS): datos que carga RH al completar la gestión.
+      // Referencia obligatoria (1 a 40 caracteres) y días descontados entre 0 y los días del permiso.
+      function gestionRhValida(d) {
+        return textoEntre(d.referenciaRh, 1, 40)
+          && d.diasDescontados is int
+          && d.diasDescontados >= 0
+          && d.diasDescontados <= d.cantidadDias;
       }
 
       // ⚠️ IMPORTANTE: reglas de negocio de los datos del permiso.
@@ -267,6 +277,9 @@ service cloud.firestore {
         && request.resource.data.cantidadAdjuntos is int
         && request.resource.data.cantidadAdjuntos >= 0
         && request.resource.data.cantidadNotas == 0
+        // Los campos de gestión RH nacen vacíos.
+        && request.resource.data.referenciaRh == null
+        && request.resource.data.diasDescontados == null
         && request.resource.data.fechaCreacion == request.time
         && request.resource.data.fechaActualizacion == request.time;
 
@@ -316,9 +329,10 @@ service cloud.firestore {
           // rechazar: supervisor asignado → finaliza
           || (pasaA('enAprobacion', 'rechazada', 'finalizada')
             && tieneRol('supervisor') && esAsignado() && quedaSinAsignado())
-          // completar: RH asignado → finaliza
+          // completar: RH asignado → finaliza, con los datos de gestión RH cargados
           || (pasaA('enGestionRh', 'completada', 'finalizada')
-            && tieneRol('rh') && esAsignado() && quedaSinAsignado())
+            && tieneRol('rh') && esAsignado() && quedaSinAsignado()
+            && gestionRhValida(despues()))
           // rechazarRh: RH asignado → finaliza
           || (pasaA('enGestionRh', 'rechazada', 'finalizada')
             && tieneRol('rh') && esAsignado() && quedaSinAsignado())
@@ -371,6 +385,10 @@ service cloud.firestore {
         // reenviar una solicitud que le devolvieron (y se vuelven a validar).
         && (!camposModificados().hasAny(['tipoPermiso', 'fechaInicio', 'fechaFin', 'cantidadDias', 'motivo'])
             || (pasaA('devuelta', 'enAprobacion', 'aprobacion') && esSolicitante()))
+        // ⚠️ IMPORTANTE (MATRIZ_CAMPOS): los campos de gestión RH solo los carga el RH
+        // asignado y solo al completar (transicionValida exige además que sean válidos).
+        && (!camposModificados().hasAny(['referenciaRh', 'diasDescontados'])
+            || (pasaA('enGestionRh', 'completada', 'finalizada') && tieneRol('rh') && esAsignado()))
         && datosPermisoValidos(despues())
         && participantesValidos()
         && despues().fechaActualizacion == request.time

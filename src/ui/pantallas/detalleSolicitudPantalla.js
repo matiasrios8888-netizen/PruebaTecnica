@@ -5,14 +5,15 @@
  *
  * Responsabilidad:
  *   Mostrar un trámite completo y permitir actuar sobre él:
- *   - datos de la solicitud (editables solo si el usuario puede corregirlos);
+ *   - datos de la solicitud y de gestión RH, editables u ocultos según la matriz
+ *     de control de campos por rol (MATRIZ_CAMPOS);
  *   - etapa actual (barra de progreso) y a quién está asignada;
  *   - un botón por cada acción del flujo que el usuario puede ejecutar;
  *   - notas, adjuntos (ver y agregar) e historial completo (trazabilidad).
  *
  *   ⚠️ IMPORTANTE: la pantalla NO decide qué puede hacer cada rol: muestra lo
- *   que devuelve solicitudesServicio.obtenerDetalle() (acciones,
- *   puedeCorregirDatos, puedeAgregarSeguimiento), que sale de flujoSolicitud.js.
+ *   que devuelve solicitudesServicio.obtenerDetalle() (acciones, campos,
+ *   puedeAgregarSeguimiento), que sale de flujoSolicitud.js.
  *
  * Depende de: src/services/solicitudesServicio.js, src/services/archivos.js,
  *   src/config/constantes.js, src/ui/componentes/marco.js, src/ui/router.js,
@@ -27,10 +28,17 @@ import {
   agregarAdjunto,
 } from '../../services/solicitudesServicio.js';
 import { crearUrlDeAdjunto } from '../../services/archivos.js';
-import { LARGO_MAXIMO_COMENTARIO, LARGO_MAXIMO_MOTIVO } from '../../services/flujoSolicitud.js';
 import {
+  LARGO_MAXIMO_COMENTARIO,
+  LARGO_MAXIMO_MOTIVO,
+  LARGO_MAXIMO_REFERENCIA_RH,
+} from '../../services/flujoSolicitud.js';
+import {
+  ACCESO_CAMPO,
   ACCIONES,
+  CAMPOS,
   CONFIG_TIPOS_PERMISO,
+  MATRIZ_CAMPOS,
   ETAPAS,
   NOMBRES_ACCION,
   NOMBRES_ACCION_HISTORIAL,
@@ -98,13 +106,14 @@ export async function renderizarDetalleSolicitud(contenedor, usuario, { id }) {
   // Si mientras cargaba el usuario navegó o cerró sesión, no se dibuja (BUGS.md · BUG-004).
   if (!principal.isConnected) return;
 
-  const { solicitud, historial, adjuntos, acciones, puedeAgregarSeguimiento, puedeCorregirDatos } = detalle;
+  const { solicitud, historial, adjuntos, acciones, puedeAgregarSeguimiento, campos } = detalle;
 
   principal.innerHTML = `
     ${htmlEncabezado(solicitud)}
     <div class="detalle-grilla">
       <div class="columna">
-        ${htmlDatos(solicitud, puedeCorregirDatos)}
+        ${htmlDatos(solicitud, campos)}
+        ${htmlGestionRh(solicitud, campos)}
         ${htmlHistorial(historial)}
       </div>
       <div class="columna">
@@ -115,7 +124,7 @@ export async function renderizarDetalleSolicitud(contenedor, usuario, { id }) {
     </div>
   `;
 
-  conectarAcciones(principal, solicitud, puedeCorregirDatos);
+  conectarAcciones(principal, solicitud, campos);
   conectarNotas(principal, solicitud);
   conectarAdjuntos(principal, solicitud, adjuntos);
 }
@@ -151,13 +160,16 @@ function htmlEncabezado(solicitud) {
     </section>`;
 }
 
+/** Atributo "disabled" si el campo no es editable para este usuario (según MATRIZ_CAMPOS). */
+const atributoEdicion = (campos, campo) => (campos[campo] === ACCESO_CAMPO.EDITABLE ? '' : 'disabled');
+
 /**
- * ⚠️ IMPORTANTE (control de campos por rol): los datos del permiso se muestran
- * en campos deshabilitados, salvo para el solicitante cuando le devolvieron la
- * solicitud. En ese caso se habilitan y se guardan al "Reenviar corregida".
+ * ⚠️ IMPORTANTE (control de campos por rol): cada campo se habilita o no según
+ * "campos" (MATRIZ_CAMPOS aplicada al usuario por el servicio). Hoy los datos
+ * del permiso solo son editables para el solicitante cuando le devolvieron la
+ * solicitud, y se guardan al "Reenviar corregida".
  */
-function htmlDatos(solicitud, puedeCorregirDatos) {
-  const deshabilitado = puedeCorregirDatos ? '' : 'disabled';
+function htmlDatos(solicitud, campos) {
   const opcionesTipo = Object.entries(CONFIG_TIPOS_PERMISO)
     .map(
       ([clave, tipo]) =>
@@ -165,7 +177,10 @@ function htmlDatos(solicitud, puedeCorregirDatos) {
     )
     .join('');
 
-  const aviso = puedeCorregirDatos
+  const algunoEditable = [CAMPOS.TIPO_PERMISO, CAMPOS.FECHA_INICIO, CAMPOS.FECHA_FIN, CAMPOS.MOTIVO].some(
+    (campo) => campos[campo] === ACCESO_CAMPO.EDITABLE,
+  );
+  const aviso = algunoEditable
     ? '<p class="mensaje-alerta">Te devolvieron la solicitud: corregí lo necesario y tocá <strong>Reenviar corregida</strong>.</p>'
     : '';
 
@@ -175,18 +190,18 @@ function htmlDatos(solicitud, puedeCorregirDatos) {
       ${aviso}
       <form id="formDatos" class="formulario" novalidate>
         <label class="campo">
-          <span>Tipo de permiso</span>
-          <select name="tipoPermiso" ${deshabilitado}>${opcionesTipo}</select>
+          <span>${escaparHtml(MATRIZ_CAMPOS[CAMPOS.TIPO_PERMISO].etiqueta)}</span>
+          <select name="tipoPermiso" ${atributoEdicion(campos, CAMPOS.TIPO_PERMISO)}>${opcionesTipo}</select>
         </label>
         <div class="fila">
-          <label class="campo"><span>Desde</span>
-            <input type="date" name="fechaInicio" value="${escaparHtml(solicitud.fechaInicio)}" ${deshabilitado} /></label>
-          <label class="campo"><span>Hasta (inclusive)</span>
-            <input type="date" name="fechaFin" value="${escaparHtml(solicitud.fechaFin)}" ${deshabilitado} /></label>
+          <label class="campo"><span>${escaparHtml(MATRIZ_CAMPOS[CAMPOS.FECHA_INICIO].etiqueta)}</span>
+            <input type="date" name="fechaInicio" value="${escaparHtml(solicitud.fechaInicio)}" ${atributoEdicion(campos, CAMPOS.FECHA_INICIO)} /></label>
+          <label class="campo"><span>${escaparHtml(MATRIZ_CAMPOS[CAMPOS.FECHA_FIN].etiqueta)}</span>
+            <input type="date" name="fechaFin" value="${escaparHtml(solicitud.fechaFin)}" ${atributoEdicion(campos, CAMPOS.FECHA_FIN)} /></label>
         </div>
         <label class="campo">
-          <span>Motivo</span>
-          <textarea name="motivo" rows="3" maxlength="${LARGO_MAXIMO_MOTIVO}" ${deshabilitado}>${escaparHtml(solicitud.motivo)}</textarea>
+          <span>${escaparHtml(MATRIZ_CAMPOS[CAMPOS.MOTIVO].etiqueta)}</span>
+          <textarea name="motivo" rows="3" maxlength="${LARGO_MAXIMO_MOTIVO}" ${atributoEdicion(campos, CAMPOS.MOTIVO)}>${escaparHtml(solicitud.motivo)}</textarea>
         </label>
       </form>
       <dl class="datos">
@@ -196,6 +211,41 @@ function htmlDatos(solicitud, puedeCorregirDatos) {
         <dt>Creada</dt><dd>${formatearFechaHora(solicitud.fechaCreacion)}</dd>
         <dt>Última actualización</dt><dd>${formatearFechaHora(solicitud.fechaActualizacion)}</dd>
       </dl>
+    </section>`;
+}
+
+/**
+ * ⚠️ IMPORTANTE (control de campos por rol): sección de gestión RH.
+ *   - Oculta si el usuario no puede ver ninguno de sus campos (ej: la solicitante
+ *     mientras RH la gestiona).
+ *   - Editable para el RH asignado mientras está en gestión RH; se guarda al
+ *     "Completar gestión" (la referencia es obligatoria).
+ *   - Solo lectura para RH y admin, y para todos una vez completada.
+ */
+function htmlGestionRh(solicitud, campos) {
+  const camposRh = [CAMPOS.REFERENCIA_RH, CAMPOS.DIAS_DESCONTADOS];
+  if (camposRh.every((campo) => campos[campo] === ACCESO_CAMPO.OCULTO)) return '';
+
+  const editable = camposRh.some((campo) => campos[campo] === ACCESO_CAMPO.EDITABLE);
+  const ayuda = editable
+    ? '<p class="ayuda">Completá estos datos antes de tocar <strong>Completar gestión</strong>. La referencia es obligatoria.</p>'
+    : '';
+  const valor = (campo) => solicitud[campo] ?? '';
+
+  return `
+    <section class="tarjeta tarjeta--ancha">
+      <h2 class="titulo--seccion">Gestión RH</h2>
+      ${ayuda}
+      <form id="formGestionRh" class="formulario" novalidate>
+        <div class="fila">
+          <label class="campo"><span>${escaparHtml(MATRIZ_CAMPOS[CAMPOS.REFERENCIA_RH].etiqueta)}</span>
+            <input type="text" name="referenciaRh" maxlength="${LARGO_MAXIMO_REFERENCIA_RH}" placeholder="${editable ? 'Ej: LIQ-2026-0042' : '—'}"
+              value="${escaparHtml(valor(CAMPOS.REFERENCIA_RH))}" ${atributoEdicion(campos, CAMPOS.REFERENCIA_RH)} /></label>
+          <label class="campo"><span>${escaparHtml(MATRIZ_CAMPOS[CAMPOS.DIAS_DESCONTADOS].etiqueta)}</span>
+            <input type="number" name="diasDescontados" min="0" max="${escaparHtml(solicitud.cantidadDias)}" step="1" placeholder="${editable ? `0 a ${escaparHtml(solicitud.cantidadDias)}` : '—'}"
+              value="${escaparHtml(valor(CAMPOS.DIAS_DESCONTADOS))}" ${atributoEdicion(campos, CAMPOS.DIAS_DESCONTADOS)} /></label>
+        </div>
+      </form>
     </section>`;
 }
 
@@ -332,10 +382,14 @@ function ocultarErrorAlEditar(elementos, mensajeError) {
   }
 }
 
-function conectarAcciones(principal, solicitud, puedeCorregirDatos) {
+function conectarAcciones(principal, solicitud, campos) {
   const mensajeError = principal.querySelector('#errorAccion');
-  // El error de una acción puede venir del comentario o de los datos corregidos (al reenviar).
-  ocultarErrorAlEditar([principal.querySelector('#comentarioAccion'), principal.querySelector('#formDatos')], mensajeError);
+  // El error de una acción puede venir del comentario, de los datos corregidos (al
+  // reenviar) o de los datos de gestión RH (al completar).
+  ocultarErrorAlEditar(
+    [principal.querySelector('#comentarioAccion'), principal.querySelector('#formDatos'), principal.querySelector('#formGestionRh')],
+    mensajeError,
+  );
   for (const boton of principal.querySelectorAll('[data-accion]')) {
     boton.addEventListener('click', () => {
       const accion = boton.dataset.accion;
@@ -343,13 +397,19 @@ function conectarAcciones(principal, solicitud, puedeCorregirDatos) {
         return;
       }
       const comentario = principal.querySelector('#comentarioAccion').value;
-      // Al reenviar se mandan los datos del formulario (corregidos o no).
+      // Cada acción lleva los campos que la matriz le asigna (MATRIZ_CAMPOS → edicion.accion).
       const datosCorregidos =
-        accion === ACCIONES.REENVIAR && puedeCorregirDatos ? leerFormularioDatos(principal) : undefined;
+        accion === ACCIONES.REENVIAR && campos[CAMPOS.TIPO_PERMISO] === ACCESO_CAMPO.EDITABLE
+          ? leerFormularioDatos(principal)
+          : undefined;
+      const datosGestionRh =
+        accion === ACCIONES.COMPLETAR && campos[CAMPOS.REFERENCIA_RH] === ACCESO_CAMPO.EDITABLE
+          ? leerFormularioGestionRh(principal)
+          : undefined;
       ejecutarConEstado(
         boton,
         mensajeError,
-        () => ejecutarAccion(solicitud.id, accion, { comentario, datosCorregidos }),
+        () => ejecutarAccion(solicitud.id, accion, { comentario, datosCorregidos, datosGestionRh }),
         `${solicitud.numero}: ${NOMBRES_ACCION[accion]} ✔`,
       );
     });
@@ -364,6 +424,11 @@ function leerFormularioDatos(principal) {
     fechaFin: campos.fechaFin.value,
     motivo: campos.motivo.value,
   };
+}
+
+function leerFormularioGestionRh(principal) {
+  const campos = principal.querySelector('#formGestionRh').elements;
+  return { referenciaRh: campos.referenciaRh.value, diasDescontados: campos.diasDescontados.value };
 }
 
 function conectarNotas(principal, solicitud) {

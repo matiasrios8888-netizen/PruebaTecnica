@@ -40,7 +40,7 @@ import {
   construirEventoNota,
   formatearNumeroSolicitud,
   puedeAgregarSeguimiento,
-  puedeCorregirDatos,
+  accesoACampos,
   validarArchivoAdjunto,
   validarDatosSolicitud,
 } from './flujoSolicitud.js';
@@ -183,7 +183,7 @@ export async function crearSolicitud(datosFormulario, archivos = []) {
  *   adjuntos: import('../data/modelos.js').Adjunto[],
  *   acciones: string[],
  *   puedeAgregarSeguimiento: boolean,
- *   puedeCorregirDatos: boolean,
+ *   campos: Record<string, string>,
  * }>}
  * @throws {ErrorAplicacion} Si no existe o el usuario no tiene permiso para verla.
  */
@@ -214,7 +214,8 @@ export async function obtenerDetalle(id) {
       adjuntos,
       acciones: accionesDisponibles(solicitud, usuario),
       puedeAgregarSeguimiento: puedeAgregarSeguimiento(solicitud, usuario),
-      puedeCorregirDatos: puedeCorregirDatos(solicitud, usuario),
+      // ⚠️ IMPORTANTE: control de campos por rol (MATRIZ_CAMPOS) aplicado a este usuario.
+      campos: accesoACampos(solicitud, usuario),
     };
   } catch (error) {
     throw errorParaUsuario(error, 'No se pudo cargar la solicitud.');
@@ -267,10 +268,12 @@ export async function cargarBandeja() {
  * @param {string} [opciones.comentario] - Obligatorio al devolver y al rechazar.
  * @param {{ tipoPermiso: string, fechaInicio: string, fechaFin: string, motivo: string }} [opciones.datosCorregidos]
  *   Solo al reenviar: los datos corregidos por el solicitante.
+ * @param {{ referenciaRh: string, diasDescontados: number|string }} [opciones.datosGestionRh]
+ *   Solo al completar: lo que carga RH (ver MATRIZ_CAMPOS).
  * @returns {Promise<void>}
  * @throws {ErrorAplicacion}
  */
-export async function ejecutarAccion(id, accion, { comentario = '', datosCorregidos } = {}) {
+export async function ejecutarAccion(id, accion, { comentario = '', datosCorregidos, datosGestionRh } = {}) {
   try {
     const usuario = usuarioRequerido();
     if (accion === ACCIONES.CREAR) throw new ErrorAplicacion('Acción no válida.', 'accionInvalida');
@@ -293,6 +296,7 @@ export async function ejecutarAccion(id, accion, { comentario = '', datosCorregi
         solicitante: { id: solicitud.solicitanteId, nombre: solicitud.solicitanteNombre },
         supervisor: supervisor ?? undefined,
         usuariosRh,
+        datosGestionRh,
       });
       // ⚠️ IMPORTANTE: los datos del permiso solo se corrigen al reenviar una devuelta.
       const correccion =

@@ -100,6 +100,10 @@
  * @property {string[]} participantes - uids de todos los que intervinieron (pestaña "Enviadas").
  * @property {number} cantidadAdjuntos
  * @property {number} cantidadNotas
+ * @property {string|null} referenciaRh - Gestión RH: número de registro en liquidación. Nace en null
+ *   y solo lo carga el RH asignado al completar (MATRIZ_CAMPOS).
+ * @property {number|null} diasDescontados - Gestión RH: días descontados del saldo (0 a cantidadDias).
+ *   Nace en null y solo lo carga el RH asignado al completar.
  * @property {string} ultimoEventoId - 📝 Id del último evento del historial. Todo cambio de la
  *   solicitud (salvo marcarla como vista) debe apuntar a un evento nuevo creado en el mismo
  *   lote; firestore.rules lo verifica.
@@ -125,6 +129,8 @@
  *   "participantes": ["uidIniciador", "uidSupervisor"],
  *   "cantidadAdjuntos": 0,
  *   "cantidadNotas": 0,
+ *   "referenciaRh": null,
+ *   "diasDescontados": null,
  *   "ultimoEventoId": "Xb3kP9qL2mN7",
  *   "fechaCreacion": "<Timestamp>",
  *   "fechaActualizacion": "<Timestamp>"

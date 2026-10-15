@@ -537,3 +537,39 @@ Construimos el flujo completo Solicitar → Aprobar → Gestionar RH de punta a 
   2. Probá las pestañas, buscá "gomez vacaciones" y combiná filtros.
   3. Abrí una solicitud y volvé con el botón Atrás del navegador: seguís en la misma pestaña y con los mismos filtros.
 - **Pendientes o dudas:** en las capturas el texto del orden quedaba cortado ("Actualizadas recien…"). Las etiquetas se acortaron ("Más recientes", etc.) y ese cambio entra con el commit del próximo paso, porque está en `constantes.js`, que ya tiene cambios de ese paso.
+
+---
+
+## 2026-10-15 – Fase 3 – Paso: matriz de control de campos por rol y gestión RH
+
+- **Qué hicimos:** el control de campos por rol pasó de un `if` suelto a una **matriz** (`MATRIZ_CAMPOS`) que define, para cada campo, quién lo edita, en qué estado, con qué acción se guarda y quién lo ve. Sumamos dos campos de gestión RH:
+  - `referenciaRh`: referencia de liquidación, obligatoria para completar;
+  - `diasDescontados`: entre 0 y los días del permiso.
+
+  Los carga solo el RH asignado al completar. Las reglas exigen lo mismo, y el detalle se dibuja a partir de la matriz.
+- **Archivos creados o modificados:**
+  - `src/config/constantes.js`: `CAMPOS`, `ACCESO_CAMPO` y `MATRIZ_CAMPOS`. También van acá las etiquetas de orden más cortas que quedaron pendientes del paso anterior.
+  - `src/services/flujoSolicitud.js`: `accesoACampos()` (editable / lectura / oculto) y `validarGestionRh()`. `calcularTransicion()` deja los campos RH en `null` al crear y los exige al completar.
+  - `src/services/solicitudesServicio.js`: `obtenerDetalle()` devuelve `campos` (la matriz aplicada al usuario); `ejecutarAccion()` recibe `datosGestionRh`.
+  - `src/ui/pantallas/detalleSolicitudPantalla.js`: los campos se habilitan según la matriz; nueva sección "Gestión RH" (oculta, de lectura o editable).
+  - `firestore.rules`: campos nuevos en `null` al crear; solo el RH asignado los carga al completar; referencia de 1 a 40 caracteres; días entre 0 y `cantidadDias`.
+  - `scripts/tests/reglas.test.mjs`: 6 tests nuevos de gestión RH (52 en total).
+  - `scripts/tests/flujoSolicitud.test.mjs`: 10 tests nuevos de la matriz y la validación RH (54 unitarios).
+  - `scripts/seed.mjs` y `scripts/datosPrueba.mjs`: las solicitudes completadas traen referencia y días descontados.
+  - `src/data/modelos.js` y `docs/MODELO_DATOS.md`: campos nuevos y tabla de la matriz.
+- **Conceptos aprendidos:**
+  - **Configuración en vez de `if`:** la matriz es un dato. Sumar un campo o cambiar quién lo edita se hace en `constantes.js`, sin tocar la pantalla.
+  - **Editar vs. ver:** las reglas de Firestore protegen la **edición** campo por campo, pero no pueden ocultar campos de un documento que el usuario puede leer. La visibilidad es de la interfaz, y por eso esos campos no guardan datos sensibles.
+  - **Validar en tres lugares:** pantalla (número entre 0 y N), servicio (`validarGestionRh`) y reglas (`gestionRhValida`).
+- **Comandos usados:**
+  - `npm test`: 54 unitarios + 52 de reglas, todos en verde.
+  - `firebase deploy --only firestore:rules` y `npm run seed`: reglas publicadas y datos recargados.
+  - Prueba en el navegador:
+    - Laura intenta completar sin referencia (error) y con 9 días en un permiso de 3 (error); completa con 3 y los campos quedan de solo lectura;
+    - Ana ve la gestión RH solo una vez completada, y edita los datos solo en su devuelta;
+    - Carlos no ve la gestión RH mientras está en curso;
+    - Martín (admin) la ve en lectura.
+- **Cómo probarlo:**
+  1. Como `rh@bprosys.test`, abrí `SOL-0005`: la sección "Gestión RH" está habilitada. Probá completar sin referencia.
+  2. Como `iniciador@bprosys.test`, abrí la misma solicitud antes y después de completarla.
+- **Pendientes o dudas:** durante esta prueba se detectaron **dos bugs** en código que ya está en `main`: el seed cierra las sesiones abiertas (BUG-006) y la columna de acciones del detalle se desborda en pantallas medianas (BUG-007). Se corrigen cada uno en su rama `fix/...` desde `main`, como pide la regla.

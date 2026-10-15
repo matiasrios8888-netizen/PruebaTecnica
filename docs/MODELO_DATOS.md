@@ -116,6 +116,8 @@ El trámite. Algunos datos están **desnormalizados** (copiados), como `solicita
 | `participantes` | string[] | uids de todos los que intervinieron (pestaña **Enviadas**). |
 | `cantidadAdjuntos` | number | Contador para mostrar en la bandeja sin leer la subcolección. |
 | `cantidadNotas` | number | Ídem para notas. |
+| `referenciaRh` | string \| null | **Gestión RH:** número de registro en liquidación (1 a 40 caracteres). Nace en `null`; lo carga solo el RH asignado al completar (obligatorio para completar). |
+| `diasDescontados` | number \| null | **Gestión RH:** días descontados del saldo (0 a `cantidadDias`). Nace en `null`; lo carga solo el RH asignado al completar. |
 | `ultimoEventoId` | string | Id del último evento del historial. Todo cambio (salvo marcarla como vista) debe apuntar a un evento creado en el mismo lote. |
 | `fechaCreacion` | Timestamp | |
 | `fechaActualizacion` | Timestamp | Se usa para ordenar la bandeja. |
@@ -140,6 +142,8 @@ El trámite. Algunos datos están **desnormalizados** (copiados), como `solicita
   "participantes": ["uidIniciador", "uidSupervisor"],
   "cantidadAdjuntos": 0,
   "cantidadNotas": 0,
+  "referenciaRh": null,
+  "diasDescontados": null,
   "ultimoEventoId": "Xb3kP9qL2mN7",
   "fechaCreacion": "<Timestamp>",
   "fechaActualizacion": "<Timestamp>"
@@ -164,6 +168,15 @@ Asignación:
 - Al aprobar → un usuario RH activo, por **reparto rotativo** según el número: los RH activos se ordenan y se toma el que está en la posición `número % cantidad de RH`.
 - Al devolver → el solicitante.
 - En los estados finales → `null`.
+
+### Control de campos por rol (`MATRIZ_CAMPOS` en `constantes.js`)
+
+| Campo | Quién lo edita (y con qué acción se guarda) | Quién lo ve |
+|---|---|---|
+| `tipoPermiso`, `fechaInicio`, `fechaFin`, `motivo` | El solicitante, con la solicitud **devuelta** (se guarda al *reenviar*) | Todos los que pueden abrir la solicitud |
+| `referenciaRh`, `diasDescontados` | El RH **asignado**, en **gestión RH** (se guarda al *completar*) | RH y admin en gestión RH y completada; **todos** una vez completada |
+
+La pantalla de detalle se dibuja con `accesoACampos()` (editable / lectura / oculto) y `firestore.rules` exige la misma regla de **edición**. Firestore no puede ocultar campos sueltos de un documento: la visibilidad es de la interfaz. Por eso estos campos no guardan datos sensibles.
 
 **Trazabilidad en las dos direcciones:** todo cambio de la solicitud (estado, nota, adjunto, datos) apunta en `ultimoEventoId` a un evento creado en el mismo lote, y cada evento tiene que coincidir con el cambio real de la solicitud. La única excepción es marcarla como vista (`vistaPorAsignado`), que no es una acción sobre el trámite.
 

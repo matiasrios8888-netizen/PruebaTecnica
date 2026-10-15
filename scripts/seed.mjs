@@ -250,6 +250,7 @@ function construirSolicitud(guion, numero, usuarios, ahora) {
           solicitante,
           supervisor,
           usuariosRh,
+          datosGestionRh: paso.gestionRh,
         }),
       );
       solicitud = { ...solicitud, ...cambios };

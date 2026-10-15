@@ -84,6 +84,8 @@ function solicitudBase(cambios = {}) {
     cantidadAdjuntos: 0,
     cantidadNotas: 0,
     ultimoEventoId: 'e1',
+    referenciaRh: null,
+    diasDescontados: null,
     fechaCreacion: Timestamp.now(),
     fechaActualizacion: Timestamp.now(),
     ...cambios,
@@ -189,6 +191,18 @@ beforeEach(async () => {
         asignadoA: 'ini',
         asignadoNombre: 'Ana Gómez',
         rolAsignado: 'iniciador',
+      }),
+    );
+    await setDoc(
+      doc(db, 'solicitudes', 'enRh1'),
+      solicitudBase({
+        numero: 'SOL-0005',
+        estadoActual: 'enGestionRh',
+        etapaActual: 'gestionRh',
+        asignadoA: 'rh',
+        asignadoNombre: 'Laura Fernández',
+        rolAsignado: 'rh',
+        participantes: ['ini', 'sup', 'rh'],
       }),
     );
     await setDoc(
@@ -382,6 +396,10 @@ describe('solicitudes: creación', () => {
     await assertFails(crear('ini', { fechaFin: '2026-11-22', cantidadDias: 20 }));
   });
 
+  test('no se puede crear con campos de gestión RH ya cargados', async () => {
+    await assertFails(crear('ini', { referenciaRh: 'LIQ-1', diasDescontados: 5 }));
+  });
+
   test('no se puede crear directamente en otro estado', async () => {
     await assertFails(crear('ini', { estadoActual: 'enGestionRh', etapaActual: 'gestionRh' }));
   });
@@ -510,6 +528,83 @@ describe('solicitudes: transiciones', () => {
 
   test('las solicitudes no se borran', async () => {
     await assertFails(deleteDoc(doc(comoUsuario('admin'), 'solicitudes/s1')));
+  });
+});
+
+// -------------------------------------------------------------
+// gestión RH: control de campos por rol (MATRIZ_CAMPOS)
+// -------------------------------------------------------------
+
+describe('gestión RH (campos por rol)', () => {
+  const COMPLETAR = {
+    estadoAnterior: 'enGestionRh',
+    estadoNuevo: 'completada',
+    etapaAnterior: 'gestionRh',
+    etapaNueva: 'finalizada',
+  };
+  const finalizada = (estado) => ({
+    estadoActual: estado,
+    etapaActual: 'finalizada',
+    asignadoA: null,
+    asignadoNombre: null,
+    rolAsignado: null,
+    vistaPorAsignado: true,
+  });
+
+  /** Ejecuta una acción sobre "enRh1" con su evento, como la app. */
+  function actuar(uid, datos, eventoNuevo, id = 'enRh1') {
+    const db = comoUsuario(uid);
+    const referenciaEvento = doc(collection(db, `solicitudes/${id}/historial`));
+    const lote = writeBatch(db);
+    lote.update(doc(db, `solicitudes/${id}`), { ...datos, ultimoEventoId: referenciaEvento.id, fechaActualizacion: serverTimestamp() });
+    lote.set(referenciaEvento, eventoNuevo);
+    return lote.commit();
+  }
+
+  test('RH completa cargando referencia y días descontados', async () => {
+    await assertSucceeds(
+      actuar('rh', { ...finalizada('completada'), referenciaRh: 'LIQ-2026-0042', diasDescontados: 5 }, evento('rh', 'completada', COMPLETAR)),
+    );
+  });
+
+  test('no se puede completar sin la referencia de liquidación', async () => {
+    await assertFails(actuar('rh', { ...finalizada('completada'), diasDescontados: 5 }, evento('rh', 'completada', COMPLETAR)));
+  });
+
+  test('los días descontados no pueden superar los del permiso', async () => {
+    await assertFails(
+      actuar('rh', { ...finalizada('completada'), referenciaRh: 'LIQ-1', diasDescontados: 6 }, evento('rh', 'completada', COMPLETAR)),
+    );
+  });
+
+  test('al rechazar en RH no se cargan los campos de gestión', async () => {
+    await assertFails(
+      actuar(
+        'rh',
+        { ...finalizada('rechazada'), referenciaRh: 'LIQ-1', diasDescontados: 0 },
+        evento('rh', 'rechazada', { ...COMPLETAR, estadoNuevo: 'rechazada' }, 'Sin saldo'),
+      ),
+    );
+  });
+
+  test('el supervisor no puede cargar campos de RH al aprobar', async () => {
+    await assertFails(
+      actuar(
+        'sup',
+        {
+          estadoActual: 'enGestionRh',
+          etapaActual: 'gestionRh',
+          asignadoA: 'rh',
+          asignadoNombre: 'Laura Fernández',
+          rolAsignado: 'rh',
+          vistaPorAsignado: false,
+          participantes: ['ini', 'sup', 'rh'],
+          referenciaRh: 'LIQ-trucha',
+        },
+        evento('sup', 'aprobada', APROBAR),
+        's1',
+      ),
+    );
   });
 });
 
