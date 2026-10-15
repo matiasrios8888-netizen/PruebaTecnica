@@ -87,6 +87,7 @@ export {
   doc,
   getDoc,
   getDocs,
+  getCountFromServer,
   collection,
   query,
   where,

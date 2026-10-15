@@ -98,6 +98,13 @@ export const ROLES = Object.freeze({
  */
 export const ROLES_VEN_TODAS = Object.freeze([ROLES.RH, ROLES.ADMIN]);
 
+/**
+ * 🔒 SEGURIDAD: roles que ven los reportes de gestión (tienen el permiso
+ * PERMISOS.REPORTES_VER). Los reportes cuentan y leen todas las solicitudes,
+ * algo que firestore.rules solo permite a estos roles.
+ */
+export const ROLES_VEN_REPORTES = Object.freeze([ROLES.RH, ROLES.ADMIN]);
+
 /** Texto para mostrar de cada rol. */
 export const NOMBRES_ROL = Object.freeze({
   [ROLES.INICIADOR]: 'Iniciador',
@@ -265,6 +272,25 @@ export const ESTADOS_FINALES = Object.freeze([
   ESTADOS.RECHAZADA,
   ESTADOS.CANCELADA,
 ]);
+
+/** Estados de un trámite en curso: siempre hay alguien asignado. */
+export const ESTADOS_ABIERTOS = Object.freeze(
+  Object.values(ESTADOS).filter((estado) => !ESTADOS_FINALES.includes(estado)),
+);
+
+/**
+ * Etapa a la que pertenece cada estado. Cada estado tiene una sola etapa, así que
+ * el reporte "distribución por etapa" se arma sumando los conteos por estado
+ * (DECISIONES.md #27). Un test verifica que coincida con TRANSICIONES.
+ */
+export const ETAPA_DE_ESTADO = Object.freeze({
+  [ESTADOS.EN_APROBACION]: ETAPAS.APROBACION,
+  [ESTADOS.DEVUELTA]: ETAPAS.SOLICITUD,
+  [ESTADOS.EN_GESTION_RH]: ETAPAS.GESTION_RH,
+  [ESTADOS.COMPLETADA]: ETAPAS.FINALIZADA,
+  [ESTADOS.RECHAZADA]: ETAPAS.FINALIZADA,
+  [ESTADOS.CANCELADA]: ETAPAS.FINALIZADA,
+});
 
 // -------------------------------------------------------------
 // Historial (trazabilidad)

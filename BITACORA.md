@@ -927,3 +927,34 @@ Construimos el mantenimiento de usuarios y roles para el administrador:
 - **Roles:** son los 4 que conoce el flujo. El admin edita su nombre y descripción y puede volver a crear uno que se pierda, siempre con sus permisos de fábrica.
 - **Calidad:** la lógica es pura y testeada, y las reglas de Firestore suman lo que el servidor puede garantizar. Terminamos con 151 tests en verde.
 - **Proceso:** encontramos y corregimos un bug en código ya publicado (BUG-008) y un error de proceso (OBS-005) con el flujo de ramas `fix/`, sin tocar `main` directamente.
+
+---
+
+## 2026-10-15 – Fase 5 – Paso: lógica de los reportes, consultas y tests
+
+- **Qué hicimos:** preparamos todo lo que necesitan los dos reportes de gestión antes de dibujarlos (decisión 27).
+  - **Distribución por etapa:** se arma sumando conteos por estado, que Firestore cuenta en el servidor sin enviar los documentos.
+  - **Carga por usuario:** se arma agrupando los trámites abiertos por persona asignada: pendientes, nuevas (sin abrir) y el trámite más antiguo de cada bandeja.
+  - **Problemas:** el reporte marca si algún trámite quedó asignado a alguien dado de baja o inexistente.
+- **Archivos creados o modificados:**
+  - `src/config/constantes.js`:
+    - `ESTADOS_ABIERTOS`;
+    - `ETAPA_DE_ESTADO`, la etapa de cada estado;
+    - `ROLES_VEN_REPORTES` (RH y admin).
+  - `src/services/reportes.js` (nuevo, puro): `distribucionPorEtapa()` y `cargaPorUsuario()`.
+  - `src/data/solicitudesRepositorio.js`: `contarPorEstado()` (consulta de conteo) y `listarAbiertas()`.
+  - `src/config/firebase.js`: reexporta `getCountFromServer`.
+  - `scripts/tests/reportes.test.mjs` (nuevo): 9 tests. Uno verifica que `ETAPA_DE_ESTADO` coincida con `TRANSICIONES`.
+  - `scripts/tests/reglas.test.mjs`: 4 tests de las consultas de los reportes y la importación de `assert`.
+  - `scripts/package.json`: suma `reportes.test.mjs` a `test:unitarios`.
+  - `DECISIONES.md`: decisión 27.
+- **Conceptos aprendidos:**
+  - **Consulta de agregación (`count()`):** le pide a Firestore solo el número de documentos que cumplen una condición. No viajan los documentos y cuesta 1 lectura cada 1.000 contados.
+  - **Las reglas también se aplican a los conteos:** contar es leer. Un supervisor no puede contar todas las solicitudes, por la misma razón por la que no puede listarlas.
+  - **Un test que vigila dos tablas:** `ETAPA_DE_ESTADO` repite información de `TRANSICIONES`. El test las compara, así que si alguien cambia una y se olvida de la otra, falla.
+- **Comandos usados:**
+  - `git switch -c feature/reportes`.
+  - `npm run test:unitarios`: 91, 9 nuevos.
+  - `npm run test:reglas`: 73, 4 nuevos. Con los datos de los tests, RH cuenta 3 en aprobación y admin lista 5 abiertos.
+- **Cómo probarlo:** desde `scripts/`, correr `npm test`.
+- **Pendientes o dudas:** la pantalla de reportes se hace en los pasos siguientes.

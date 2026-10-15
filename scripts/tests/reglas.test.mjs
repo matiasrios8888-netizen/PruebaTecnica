@@ -18,6 +18,7 @@
  */
 
 import { describe, test, before, after, beforeEach } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import {
   initializeTestEnvironment,
@@ -29,6 +30,7 @@ import {
   collection,
   getDoc,
   getDocs,
+  getCountFromServer,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -474,6 +476,43 @@ describe('solicitudes: lectura', () => {
 // -------------------------------------------------------------
 // solicitudes: creación
 // -------------------------------------------------------------
+
+// -------------------------------------------------------------
+// reportes (consultas de toda la empresa)
+// -------------------------------------------------------------
+
+/** Cuenta las solicitudes en un estado, como el reporte de distribución. */
+const contarEnEstado = (uid, estado) =>
+  getCountFromServer(query(collection(comoUsuario(uid), 'solicitudes'), where('estadoActual', '==', estado)));
+
+/** Lista los trámites abiertos, como el reporte de carga por usuario. */
+const listarAbiertas = (uid) =>
+  getDocs(query(collection(comoUsuario(uid), 'solicitudes'), where('estadoActual', 'in', ['enAprobacion', 'devuelta', 'enGestionRh'])));
+
+describe('reportes', () => {
+  test('RH y admin cuentan las solicitudes por estado en el servidor', async () => {
+    const resultado = await assertSucceeds(contarEnEstado('rh', 'enAprobacion'));
+    assert.equal(resultado.data().count, 3); // s1, ajena y deInactivo
+    await assertSucceeds(contarEnEstado('admin', 'devuelta'));
+  });
+
+  test('un supervisor o un iniciador no pueden contar todas las solicitudes', async () => {
+    await assertFails(contarEnEstado('sup', 'enAprobacion'));
+    await assertFails(contarEnEstado('ini', 'enAprobacion'));
+  });
+
+  test('RH y admin listan los trámites abiertos; un supervisor no', async () => {
+    const resultado = await assertSucceeds(listarAbiertas('admin'));
+    assert.equal(resultado.size, 5);
+    await assertSucceeds(listarAbiertas('rh'));
+    await assertFails(listarAbiertas('sup'));
+  });
+
+  test('un RH dado de baja pierde el acceso a los reportes', async () => {
+    await prepararPerfiles({ rh: { activo: false } });
+    await assertFails(contarEnEstado('rh', 'enAprobacion'));
+  });
+});
 
 describe('solicitudes: creación', () => {
   /**
