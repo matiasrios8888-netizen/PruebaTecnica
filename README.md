@@ -12,11 +12,18 @@ Prueba técnica para Bprosys.
 | Fase | Contenido | Estado |
 |---|---|---|
 | 1 | Base: estructura, Firebase, login, modelo de datos, datos de prueba, reglas de seguridad | ✅ |
-| 2 | Flujo completo de una solicitud con historial | ⏳ |
+| 2 | Flujo completo de una solicitud con historial | ✅ |
 | 3 | Bandeja (pendientes / enviadas / nuevas, filtros, orden, búsqueda) y control de campos por rol | ⏳ |
 | 4 | Mantenimiento de usuarios y roles | ⏳ |
 | 5 | Reportes de gestión | ⏳ |
 | 6 | Diseño final, pruebas por rol, deploy y documentación | ⏳ |
+
+## Qué se puede hacer hoy
+
+- **Iniciador:** crear solicitudes (6 tipos de permiso, con días máximos y adjunto obligatorio según el tipo), adjuntar archivos, agregar notas, cancelar mientras no fue aprobada y corregir y reenviar una solicitud devuelta.
+- **Supervisor:** aprobar, devolver (con motivo obligatorio) o rechazar las solicitudes de su equipo.
+- **RH:** completar o rechazar la gestión de las solicitudes aprobadas (asignadas por reparto rotativo).
+- **Todos:** ver en el inicio sus tareas pendientes (marcadas como "Nueva" hasta que las abren) y las solicitudes en las que participan. En el detalle ven la etapa, los adjuntos y el historial completo.
 
 ## Arquitectura
 
@@ -38,13 +45,16 @@ src/
   config/
     firebase.js             Inicialización y único punto de contacto con el CDN de Firebase
     constantes.js           Roles, etapas, estados, transiciones, tipos de permiso, límites
-  data/                     Repositorios (Auth y Firestore) y @typedef del modelo
-  services/                 Lógica de negocio (sesión, y en próximas fases solicitudes, reportes…)
-  ui/                       Router, pantallas y utilidades de UI
+  data/                     Repositorios (Auth, usuarios, solicitudes) y @typedef del modelo
+  services/
+    flujoSolicitud.js       Lógica PURA del flujo (acciones por rol, transiciones, validaciones)
+    solicitudesServicio.js  Casos de uso: crear, detalle, acciones, notas, adjuntos
+    authServicio.js         Sesión y perfil del usuario
+  ui/                       Router, marco común, pantallas (login, inicio, nueva, detalle) y utilidades
   styles/main.css
 firestore.rules             Reglas de seguridad
 firestore.indexes.json      Índices compuestos
-scripts/                    Herramientas de Node (no se publican): datos de prueba y tests de reglas
+scripts/                    Herramientas de Node (no se publican): datos de prueba y tests (lógica + reglas)
 docs/MODELO_DATOS.md        Colecciones, campos, tipos y ejemplos
 DECISIONES.md               Decisiones técnicas con alternativas y justificación
 BITACORA.md                 Registro paso a paso de la construcción

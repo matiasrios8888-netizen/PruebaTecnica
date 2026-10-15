@@ -368,3 +368,38 @@ Armamos la base de una app de permisos con arquitectura en capas (UI → servici
   4. Volvé como iniciador: los campos ahora se pueden editar → **Reenviar corregida**.
   5. Supervisor → **Aprobar**; `rh@bprosys.test` → adjuntá un archivo → **Completar gestión**.
 - **Pendientes o dudas:** por ahora a una solicitud se llega por su URL; en el próximo paso el inicio lista las tareas y solicitudes del usuario.
+
+---
+
+## 2026-10-15 – Fase 2 – Paso: inicio con tareas y solicitudes, prueba final y cierre
+
+- **Qué hicimos:** el inicio muestra dos listas, "Mis tareas pendientes" (con la marca **Nueva** hasta que el asignado la abre) y "Mis solicitudes". Cada fila abre el detalle. Recargamos los datos de prueba, corrimos los 72 tests, probamos el inicio con los 4 roles, documentamos las decisiones de la fase y cerramos la fase con el merge a `main`.
+- **Archivos creados o modificados:**
+  - `src/ui/pantallas/inicioPantalla.js`: listas de tareas y solicitudes con estado, asignado y fecha de actualización.
+  - `README.md`: estado de las fases, qué puede hacer cada rol y estructura actualizada.
+  - `DECISIONES.md`: 19 (lógica pura compartida), 20 (transacciones con función "armar") y 21 (un único mensaje para "no existe" y "sin permiso").
+- **Conceptos aprendidos:**
+  - **"Nueva" sin campos extra:** se calcula con `asignadoA == yo` y `vistaPorAsignado == false`. Al abrir el detalle se marca como vista, y es el único cambio que no deja evento, porque no es una acción sobre el trámite.
+  - **Orden en el cliente:** por ahora las listas se ordenan en el navegador. En la Fase 3 la bandeja ordena y filtra con consultas e índices compuestos de Firestore.
+- **Comandos usados:**
+  - `npm run seed`: recargar los datos de prueba (borra las solicitudes creadas por las pruebas).
+  - `npm test`: 28 tests de lógica + 44 de reglas, todos en verde.
+  - Prueba en el navegador:
+    - supervisor: 3 tareas (2 nuevas); al abrir `SOL-0001` deja de ser nueva;
+    - RH: 3 tareas (2 nuevas);
+    - iniciadora: 1 tarea (`SOL-0004` devuelta);
+    - admin: sin tareas.
+  - `git merge --no-ff feature/flujo-aprobacion`: integra la fase a `main`.
+- **Cómo probarlo:**
+  1. Live Server → entrá con cada usuario y mirá "Mis tareas pendientes".
+  2. Como supervisor, abrí `SOL-0001` (dice **Nueva**) y volvé al inicio: ya no lo dice.
+  3. Recorré el flujo completo como se describe en el paso anterior.
+- **Pendientes o dudas:**
+  - Durante una prueba apareció una vez un error `400` en la consola al cerrar sesión mientras cargaban las listas; no se reprodujo al repetirlo (probablemente la conexión de Firestore cortándose a mitad de la carga). Queda en observación.
+  - El admin y RH todavía no tienen una vista de "todas las solicitudes": llega con la bandeja de la Fase 3.
+
+---
+
+## Resumen de la Fase 2
+
+Construimos el flujo completo Solicitar → Aprobar → Gestionar RH de punta a punta: crear con adjuntos, devolver con motivo, corregir y reenviar, aprobar, completar o rechazar, notas e historial. La lógica del flujo vive en un módulo puro (`flujoSolicitud.js`) que interpreta la tabla de transiciones. Lo usan la app y el script de datos de prueba, y lo cubren 28 tests unitarios. Las escrituras son transacciones que validan contra el estado real del trámite, con número correlativo sin repeticiones. Reforzamos las reglas para que la trazabilidad sea obligatoria en las dos direcciones: ningún cambio se guarda sin su evento en el historial, y ningún evento puede mentir sobre el cambio (44 tests contra el emulador). En la interfaz, la pantalla de detalle no decide permisos: muestra un botón por cada acción que el servicio habilita y bloquea los campos según el rol y el estado.

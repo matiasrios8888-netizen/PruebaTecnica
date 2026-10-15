@@ -147,3 +147,21 @@ Registro de las decisiones importantes del proyecto: qué decidimos, qué altern
   - Un número aleatorio: no es correlativo.
 - **Por qué:** la transacción garantiza que lo que se leyó no cambió al escribir. Si otro creó una solicitud en el medio, Firestore reintenta, así que el número nunca se repite.
 - **Costo aceptado:** todas las creaciones pasan por un mismo documento. Firestore admite del orden de una escritura por segundo sostenida por documento, sobrado para el volumen de una empresa. Un usuario malintencionado podría incrementar el contador sin crear una solicitud; solo genera un salto en la numeración.
+
+## 19. Lógica del flujo en un módulo puro compartido
+
+- **Decisión:** `src/services/flujoSolicitud.js` interpreta la tabla de transiciones (acciones disponibles, cambios de cada acción, asignación, validaciones) sin usar Firebase, el DOM ni el reloj. Lo usan el servicio de la app y el script de datos de prueba.
+- **Alternativas:** escribir la lógica dentro del servicio, mezclada con las llamadas a Firestore; que el seed tenga su propia copia.
+- **Por qué:** se testea en milisegundos con `node:test` (28 tests) sin emulador ni navegador. Además, la app y los datos de prueba no pueden "pensar distinto" sobre el flujo, y el servicio queda corto: solo orquesta.
+
+## 20. Escrituras en transacción con una función "armar" del servicio
+
+- **Decisión:** el repositorio expone `crearConNumero(armar)` y `actualizarConEvento(id, armar)`. Abre una transacción, lee el dato fresco (contador o solicitud) y llama a `armar`, que pertenece al servicio y decide qué escribir. El repositorio agrega ids, `serverTimestamp()` y el enlace `ultimoEventoId`.
+- **Alternativas:** que el servicio arme el lote con datos leídos antes (pueden estar desactualizados); que el repositorio conozca las reglas del flujo.
+- **Por qué:** cada acción se valida contra el estado real en el momento de escribir. Si dos personas actúan a la vez, la segunda recibe un error claro en lugar de pisar el trabajo de la primera. Además, cada capa conserva una sola responsabilidad.
+
+## 21. Un único mensaje para "no existe" y "no tenés permiso"
+
+- **Decisión:** al abrir una solicitud inexistente o ajena se muestra "La solicitud no existe o no tenés permiso para verla".
+- **Alternativas:** mensajes distintos para cada caso.
+- **Por qué:** Firestore responde igual en los dos casos (las reglas rechazan leer un documento inexistente). Distinguirlos revelaría qué ids existen.
