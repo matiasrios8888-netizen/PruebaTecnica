@@ -186,3 +186,43 @@ Registro paso a paso de lo que se construyó. Las decisiones técnicas important
 ## Resumen de la Fase 1
 
 Armamos la base de una app de permisos con arquitectura en capas (UI → servicios → repositorios → Firebase), en JavaScript vanilla y con el SDK de Firebase desde el CDN, para que se publique como sitio estático. Diseñamos el modelo de datos en Firestore pensando en las consultas: cada solicitud tiene etapa y estado, a quién está asignada y quiénes participaron, y un historial append-only en una subcolección. Las reglas del flujo viven en una tabla de transiciones centralizada que usan la app, el script de datos de prueba y, replicada, las reglas de seguridad. El login valida perfil y estado activo, y un script con firebase-admin carga 4 usuarios y 10 solicitudes con historial coherente. La seguridad se aplica en el servidor con `firestore.rules` (rol, transiciones válidas, historial firmado con la hora del servidor, adjuntos de hasta 600 KB) y está cubierta por 30 tests automáticos contra el emulador, que detectaron un error antes de publicar.
+
+---
+
+## 2026-10-15 – Fase 2 – Paso: contador, ultimoEventoId y reparto RH
+
+- **Qué hicimos:** creamos la rama `feature/flujo-aprobacion` y ajustamos el modelo antes de construir el flujo:
+  - un contador para numerar las solicitudes sin repetir;
+  - el campo `ultimoEventoId`, para que las reglas exijan que **todo** cambio de una solicitud deje su evento en el historial;
+  - un reparto rotativo de las tareas entre los usuarios RH.
+
+  Actualizamos las reglas, los tests (de 30 a 43), el script de datos, la documentación y DECISIONES.md. Publicamos las reglas y recargamos los datos.
+- **Archivos creados o modificados:**
+  - `src/config/constantes.js`: colección `contadores` y `NUMERACION_SOLICITUD` (prefijo `SOL-`, 4 dígitos).
+  - `src/data/modelos.js`: campo `ultimoEventoId` en Solicitud y el `@typedef` Contador.
+  - `firestore.rules`:
+    - reglas de `contadores` (solo sube de a 1);
+    - número correlativo verificado al crear;
+    - supervisor activo;
+    - adjunto obligatorio según el tipo;
+    - datos del permiso editables solo al reenviar;
+    - trazabilidad en las dos direcciones (`ultimoEventoId` ↔ evento).
+  - `scripts/tests/reglas.test.mjs`: 13 tests nuevos (contador, trazabilidad, reenvío con corrección, adjunto obligatorio); los logs de rechazos esperados quedan silenciados.
+  - `scripts/seed.mjs`: guarda `ultimoEventoId` en cada solicitud y deja el contador en 10.
+  - `docs/MODELO_DATOS.md`: colección `contadores`, campo `ultimoEventoId`, reparto rotativo y trazabilidad.
+  - `DECISIONES.md`: corrección de la decisión 8 (reparto rotativo), ampliación de la 9 (trazabilidad en las dos direcciones) y decisión 18 (contador con transacción).
+- **Conceptos aprendidos:**
+  - **Transacción:** lee y escribe como una sola operación. Si lo que se leyó cambió antes de escribir, Firestore la reintenta. Por eso dos solicitudes creadas al mismo tiempo nunca reciben el mismo número.
+  - **`existsAfter` + `!exists`:** juntos significan "este documento se crea en esta misma operación". Con eso las reglas comprueban que el evento del historial es nuevo y no uno viejo reutilizado.
+  - **Trazabilidad en las dos direcciones:** la solicitud apunta a su último evento, y el evento tiene que coincidir con el cambio de la solicitud. Ninguno de los dos se puede escribir sin el otro.
+  - **Límite de las reglas (las reglas no son filtros):** "asignar al RH con menos pendientes" exigiría que el supervisor lea tareas ajenas, así que se cambió por un reparto rotativo que no necesita leer nada.
+- **Comandos usados:**
+  - `git switch -c feature/flujo-aprobacion` y `git push -u origin feature/flujo-aprobacion`: crear y publicar la rama de la Fase 2.
+  - `npm run test:reglas`: 43 tests, todos en verde.
+  - `npm run seed:simular` y `npm run seed`: validar y recargar los datos de prueba.
+  - `firebase deploy --only firestore:rules`: publicar las reglas nuevas.
+- **Cómo probarlo:**
+  1. `cd scripts` y después `npm run test:reglas` → `pass 43`, `fail 0`.
+  2. En la consola de Firebase: existe `contadores/solicitudes` con `ultimoNumero: 10`, y cada solicitud tiene `ultimoEventoId`, que coincide con el id de un documento de su `historial`.
+  3. El login sigue funcionando con los 4 usuarios.
+- **Pendientes o dudas:** el seed todavía asigna RH con su propia lógica; en el próximo paso pasa a usar el módulo compartido `flujoSolicitud.js`.

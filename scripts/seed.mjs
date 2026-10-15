@@ -9,6 +9,7 @@
  *   2. Escribe sus perfiles en "usuarios" y el catálogo de "roles".
  *   3. Borra todas las solicitudes (con su historial y adjuntos) y las vuelve
  *      a crear recorriendo el guion de cada una con la tabla TRANSICIONES.
+ *   4. Deja el contador de numeración (contadores/solicitudes) en la última usada.
  *   Es idempotente: correrlo varias veces deja siempre el mismo resultado.
  *
  * Uso (desde la carpeta scripts/):
@@ -32,6 +33,7 @@ import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
 
 import {
   COLECCIONES,
+  NUMERACION_SOLICITUD,
   ROLES,
   NOMBRES_ROL,
   PERMISOS_POR_ROL,
@@ -361,7 +363,8 @@ async function escribirUsuariosYRoles(db, usuarios) {
 }
 
 /**
- * Borra todas las solicitudes (con sus subcolecciones) y escribe las nuevas.
+ * Borra todas las solicitudes (con sus subcolecciones), escribe las nuevas y
+ * deja el contador de numeración en la última usada.
  * @param {import('firebase-admin/firestore').Firestore} db
  * @param {{ solicitud: object, eventos: object[], adjuntos: object[] }[]} construidas
  */
@@ -377,12 +380,21 @@ async function reemplazarSolicitudes(db, construidas) {
   for (const { solicitud, eventos, adjuntos } of construidas) {
     const lote = db.batch();
     const referencia = coleccion.doc();
-    lote.set(referencia, solicitud);
-    for (const evento of eventos) lote.set(referencia.collection(COLECCIONES.HISTORIAL).doc(), evento);
+    const referenciasEventos = eventos.map(() => referencia.collection(COLECCIONES.HISTORIAL).doc());
+    // 📝 TRAZABILIDAD: la solicitud apunta a su último evento, igual que exigen las reglas.
+    lote.set(referencia, { ...solicitud, ultimoEventoId: referenciasEventos.at(-1).id });
+    eventos.forEach((evento, i) => lote.set(referenciasEventos[i], evento));
     for (const adjunto of adjuntos) lote.set(referencia.collection(COLECCIONES.ADJUNTOS).doc(), adjunto);
     await lote.commit();
   }
   console.log(`  ✔ ${construidas.length} solicitudes creadas con su historial y adjuntos`);
+
+  // La próxima solicitud que se cree desde la app toma el número siguiente.
+  await db
+    .collection(COLECCIONES.CONTADORES)
+    .doc(NUMERACION_SOLICITUD.ID_CONTADOR)
+    .set({ ultimoNumero: construidas.length });
+  console.log(`  ✔ Contador de numeración en ${construidas.length}`);
 }
 
 // -------------------------------------------------------------

@@ -25,6 +25,19 @@ export const COLECCIONES = Object.freeze({
   SOLICITUDES: 'solicitudes',
   HISTORIAL: 'historial', // subcolección de cada solicitud
   ADJUNTOS: 'adjuntos', // subcolección de cada solicitud
+  CONTADORES: 'contadores',
+});
+
+/**
+ * Numeración correlativa de las solicitudes ("SOL-0001").
+ * El último número usado vive en contadores/{ID_CONTADOR}.ultimoNumero y se
+ * incrementa dentro de una transacción al crear cada solicitud.
+ * 🔒 SEGURIDAD: firestore.rules exige que el número tenga 4 dígitos (hasta SOL-9999).
+ */
+export const NUMERACION_SOLICITUD = Object.freeze({
+  ID_CONTADOR: 'solicitudes',
+  PREFIJO: 'SOL-',
+  DIGITOS: 4,
 });
 
 // -------------------------------------------------------------
