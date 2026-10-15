@@ -36,6 +36,8 @@ Todo bug o error detectado queda registrado acá, **aunque se corrija en el mome
 | BUG-003 | Mensaje confuso al abrir una solicitud inexistente o ajena | Baja | ✅ Resuelto | Fase 2 | `e761737` |
 | BUG-004 | Consultas huérfanas al cerrar sesión con datos cargando | Baja | ✅ Resuelto | Fase 2 | `fix/bugs-pre-fase-3` |
 | BUG-005 | Los mensajes de error de los formularios no se ocultaban al corregir | Baja | ✅ Resuelto | Fase 2 | `fix/bugs-pre-fase-3` |
+| BUG-006 | Recargar los datos de prueba cerraba las sesiones abiertas | Baja | ✅ Resuelto | Fase 3 | `fix/BUG-006-seed-cierra-sesiones` |
+| BUG-007 | Desbordes horizontales: columna de acciones del detalle y tablas en celulares | Media | ✅ Resuelto | Fase 3 | `fix/BUG-007-desborde-columna-acciones` |
 
 **Abiertos: 0**
 
@@ -91,6 +93,26 @@ Todo bug o error detectado queda registrado acá, **aunque se corrija en el mome
 - **Solución:** los formularios ocultan su mensaje de error en cuanto el usuario edita (eventos `input` / `change`): login, nueva solicitud y, en el detalle, acciones, notas y adjuntos (`ocultarErrorAlEditar`).
 - **Commit:** rama `fix/bugs-pre-fase-3`.
 - **Test de regresión:** prueba en el navegador de los tres casos: login, nueva solicitud y comentario en el detalle.
+
+### BUG-006 · Recargar los datos de prueba cerraba las sesiones abiertas
+- **Detectado:** Fase 3, prueba de la matriz de campos (un `400` en `identitytoolkit.googleapis.com/v1/accounts:lookup`).
+- **Severidad:** Baja (solo afecta a la demo, pero desloguea a cualquiera que la esté usando).
+- **Cómo reproducir:** iniciar sesión en la app; correr `npm run seed`; recargar la página → la sesión se cierra y la consola muestra un `400` de `accounts:lookup`.
+- **Causa:** `seed.mjs` hacía `updateUser({ password })` también sobre los usuarios que ya existían. Para Firebase, cambiar la contraseña (aunque sea la misma) invalida todas las sesiones de ese usuario. Al recargar, el SDK intenta validar la sesión vieja con `accounts:lookup`, recibe `400` y la cierra. **Es también la explicación del `400` aislado que se vio en la Fase 2**, que se había registrado como parte de BUG-004: esa prueba también se hizo justo después de recargar los datos.
+- **Solución:** a los usuarios existentes ya no se les cambia la contraseña. Para restablecerla a propósito existe `npm run seed:restablecer-claves`.
+- **Commit:** rama `fix/BUG-006-seed-cierra-sesiones`.
+- **Test de regresión:** prueba en el navegador. Iniciar sesión → `npm run seed` → recargar la página: la sesión sigue abierta y no hay respuestas con error. Además, `npm test` (28 + 44) en verde.
+
+### BUG-007 · Desbordes horizontales: columna de acciones del detalle y tablas en celulares
+- **Detectado:** Fase 3, revisando una captura del detalle de una solicitud con acciones. Al medir se encontró una segunda manifestación.
+- **Severidad:** Media (se ve mal y aparece scroll horizontal en toda la página).
+- **Cómo reproducir:**
+  1. Abrir el detalle de una solicitud con acciones en una ventana de 1024 a 1550 px: la columna derecha sobresale de la grilla (42 px a 1440 px). A 800 px, el selector de archivo genera scroll horizontal.
+  2. Abrir el inicio en un celular (390 px): la página entera tiene scroll horizontal del doble del ancho, porque la tabla empuja.
+- **Causa:** en CSS Grid, cada elemento tiene por defecto `min-width: auto`: no se achica por debajo del ancho mínimo de su contenido. El `<textarea>` y el `<input type="file">` tienen un ancho propio (~300 px) mayor que la columna de acciones (304 px de pista contra 297 px de contenido más el padding de la tarjeta), y la tabla es más ancha que un celular. Como `.columna`, `.formulario`, `.campo` y `.contenido` son grillas, el contenido empujaba hacia afuera.
+- **Solución:** `min-width: 0` en los hijos de esas grillas (`.contenido > *`, `.columna`, `.columna > *`, `.formulario > *`, `.campo`, `.campo > *`) y `max-width: 100%` en `input[type="file"]`. La tabla conserva su propio scroll interno (`.tabla-contenedor`).
+- **Commit:** rama `fix/BUG-007-desborde-columna-acciones`.
+- **Test de regresión:** medición automática en el navegador del desborde de las tarjetas y del scroll horizontal de la página en 10 anchos (1550 → 320 px), para el detalle con acciones y para el inicio: todo en 0. En el celular, la tabla mantiene su scroll interno. `npm test` en verde.
 
 ---
 

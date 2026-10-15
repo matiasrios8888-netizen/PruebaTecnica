@@ -6,9 +6,10 @@
   "scripts": {
     "seed": "node seed.mjs",
     "seed:simular": "node seed.mjs --simular",
+    "seed:restablecer-claves": "node seed.mjs --restablecer-claves",
     "test": "npm run test:unitarios && npm run test:reglas",
     "test:unitarios": "node --test tests/flujoSolicitud.test.mjs tests/bandeja.test.mjs",
-    "test:reglas":"cd .. && firebase emulators:exec --only firestore --project demo-permisos \"node --test scripts/tests/reglas.test.mjs\""
+    "test:reglas": "cd .. && firebase emulators:exec --only firestore --project demo-permisos \"node --test scripts/tests/reglas.test.mjs\""
   },
   "dependencies": {
     "firebase-admin": "14.5.0"
