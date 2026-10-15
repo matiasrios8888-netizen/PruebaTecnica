@@ -11,7 +11,19 @@
  * =============================================================
  */
 
-import { db, doc, getDoc, getDocs, collection, query, where, orderBy } from '../config/firebase.js';
+import {
+  db,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  updateDoc,
+  collection,
+  query,
+  where,
+  orderBy,
+  serverTimestamp,
+} from '../config/firebase.js';
 import { COLECCIONES } from '../config/constantes.js';
 
 /** @typedef {import('./modelos.js').Usuario} Usuario */
@@ -38,6 +50,33 @@ export async function obtenerUsuarioPorId(uid) {
 export async function listarUsuarios() {
   const resultado = await getDocs(query(collection(db, COLECCIONES.USUARIOS), orderBy('nombre')));
   return resultado.docs.map((d) => /** @type {Usuario} */ ({ id: d.id, ...d.data() }));
+}
+
+/**
+ * Crea el perfil de un usuario nuevo (el id del documento es el uid de su cuenta de Auth).
+ * 🔒 SEGURIDAD: firestore.rules solo permite crear perfiles al admin, y siempre activos.
+ * @param {string} uid
+ * @param {Omit<Usuario, 'id'|'fechaCreacion'|'fechaActualizacion'>} datos
+ * @returns {Promise<void>}
+ * @throws {import('https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js').FirebaseError}
+ */
+export function crearPerfil(uid, datos) {
+  return setDoc(doc(db, COLECCIONES.USUARIOS, uid), {
+    ...datos,
+    fechaCreacion: serverTimestamp(),
+    fechaActualizacion: serverTimestamp(),
+  });
+}
+
+/**
+ * Actualiza campos del perfil de un usuario (edición, baja o reactivación).
+ * @param {string} uid
+ * @param {Partial<Usuario>} cambios - Solo los campos que cambian.
+ * @returns {Promise<void>}
+ * @throws {import('https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js').FirebaseError}
+ */
+export function actualizarPerfil(uid, cambios) {
+  return updateDoc(doc(db, COLECCIONES.USUARIOS, uid), { ...cambios, fechaActualizacion: serverTimestamp() });
 }
 
 /**

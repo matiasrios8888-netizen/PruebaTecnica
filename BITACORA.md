@@ -721,3 +721,39 @@ Construimos la bandeja de tareas: pestañas Pendientes, Nuevas y Enviadas (y Tod
     - Sin scroll horizontal en 390 y 320 px, y sin errores en la consola.
 - **Cómo probarlo:** entrar con `admin@bprosys.test` / `Bprosys2026!` → menú "Usuarios" → probar la búsqueda y los filtros. Entrar con otro rol: el enlace no aparece y la ruta `#/usuarios` redirige a la bandeja.
 - **Pendientes o dudas:** el alta, la ficha y los roles se hacen en los pasos siguientes. Hasta entonces, el enlace de cada fila lleva a una ruta que todavía no existe, que vuelve a la bandeja.
+
+## 2026-10-15 – Fase 4 – Paso: alta de usuarios sin cerrar la sesión del admin
+
+- **Qué hicimos:**
+  - El admin da de alta usuarios desde "Usuarios → Nuevo usuario": nombre, email, rol, área, supervisor (solo para el iniciador) y contraseña inicial.
+  - La cuenta de acceso se crea en una **segunda instancia de Firebase**, así la sesión del admin no cambia. Después el admin, con su sesión, guarda el perfil.
+  - Si el alta se corta entre los dos pasos, reintentarla con el mismo email y la misma contraseña la completa (decisión 26).
+- **Archivos creados o modificados:**
+  - `src/config/firebase.js`:
+    - `obtenerAuthAltas()`: la instancia secundaria, con `inMemoryPersistence`, que se crea recién cuando se usa;
+    - reexporta `createUserWithEmailAndPassword`, `sendPasswordResetEmail` y `setDoc`.
+  - `src/data/authAdminRepositorio.js` (nuevo): crea una cuenta, comprueba una cuenta existente y envía el mail de contraseña. Siempre cierra la sesión de la instancia secundaria (`finally`).
+  - `src/data/usuariosRepositorio.js`: `crearPerfil()` y `actualizarPerfil()`.
+  - `src/services/usuariosServicio.js`: `prepararAlta()` y `crearUsuario()`. Valida, crea o completa la cuenta y guarda el perfil, con mensajes en español para los errores de Auth.
+  - `src/ui/componentes/formularioUsuario.js` (nuevo): los campos del usuario, que el alta comparte con la ficha. El supervisor solo aparece si el rol es iniciador.
+  - `src/ui/pantallas/altaUsuarioPantalla.js` (nuevo) y el botón "Nuevo usuario" en el listado.
+  - `src/main.js`: ruta `#/usuarios/nuevo`, solo para el admin.
+  - `src/styles/main.css`: regla global `[hidden] { display: none !important; }`.
+  - `.gitignore`: `scripts/tmp-*` (scripts temporales de prueba que usan la clave de servicio).
+  - `DECISIONES.md` (26 nueva y 14 marcada como implementada) y `BUGS.md` (OBS-001 ampliada).
+- **Conceptos aprendidos:**
+  - **Instancias de Firebase:** `initializeApp(config, 'altaUsuarios')` crea una app independiente con su propia sesión de Auth. Crear una cuenta loguea a esa cuenta solo en esa instancia, y el admin sigue logueado en la principal.
+  - **`try/finally`:** el `finally` se ejecuta tanto si la operación sale bien como si falla. Lo usamos para cerrar siempre la sesión de la instancia secundaria.
+  - **El atributo `hidden` y el CSS:** `hidden` equivale a `display: none`, pero cualquier regla de CSS con `display` (por ejemplo, `.campo { display: grid }`) le gana. La regla global `[hidden] { display: none !important; }` lo asegura.
+  - **Operaciones que no pueden ser atómicas:** crear la cuenta en Auth y guardar el perfil en Firestore son dos sistemas distintos, y no hay una transacción que los abarque. Por eso se diseñó cómo recuperarse si el segundo paso falla.
+- **Comandos usados:**
+  - Prueba en el navegador:
+    - **Formulario:** el supervisor está oculto hasta elegir "Iniciador" y lista solo supervisores activos (Carlos y Sofía). El error se oculta al escribir.
+    - **Validaciones:** campos vacíos → "Ingresá el nombre y apellido."; email repetido en mayúsculas → "Ya existe un usuario con ese email."; contraseña de 5 caracteres → error; sin supervisor → error.
+    - **Alta de Lucía Torres:** aparece en el listado (7 usuarios), el encabezado sigue diciendo "Martín Sosa · Administrador" también después de recargar, y Lucía entra con su contraseña inicial como iniciadora.
+  - `node tmp-prueba-fase4.mjs crear-cuenta-sin-perfil` (script temporal, ignorado por git) para simular un alta interrumpida:
+    - esa cuenta no puede entrar ("no tiene un perfil asignado");
+    - reintentar el alta con otra contraseña → "Ya existe una cuenta de acceso con ese email.";
+    - con la misma contraseña → se completa y el admin sigue logueado.
+- **Cómo probarlo:** con `admin@bprosys.test`, ir a Usuarios → Nuevo usuario y dar de alta a alguien (por ejemplo, rol Iniciador, supervisor Carlos Pérez). Después cerrar sesión y entrar con el email y la contraseña inicial de la persona nueva.
+- **Pendientes o dudas:** por ahora, después del alta se vuelve al listado; en el paso siguiente va a abrir la ficha. Los usuarios creados en las pruebas se borran al cerrar la fase con el script temporal.

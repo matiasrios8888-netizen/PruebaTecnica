@@ -19,7 +19,7 @@ import { cargarUsuarios } from '../../services/usuariosServicio.js';
 import { filtrarUsuarios, filtrosUsuariosVacios } from '../../services/gestionUsuarios.js';
 import { NOMBRES_FILTRO_ESTADO_USUARIO, ROLES } from '../../config/constantes.js';
 import { dibujarMarco } from '../componentes/marco.js';
-import { navegar, rutaFichaUsuario } from '../router.js';
+import { navegar, rutaFichaUsuario, RUTA_NUEVO_USUARIO } from '../router.js';
 import { escaparHtml, htmlOpciones } from '../utils/html.js';
 import { nombreRol } from '../utils/formato.js';
 
@@ -47,6 +47,7 @@ export async function renderizarUsuarios(contenedor, usuario) {
           <h1 class="titulo">Usuarios</h1>
           <p class="subtitulo">Colaboradores que usan la aplicación y el rol de cada uno.</p>
         </div>
+        <a href="${RUTA_NUEVO_USUARIO}" class="boton boton--primario">Nuevo usuario</a>
       </div>
       ${htmlFiltros()}
       <p class="ayuda" id="resumen" aria-live="polite">Cargando…</p>

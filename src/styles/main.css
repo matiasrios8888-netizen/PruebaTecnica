@@ -29,6 +29,12 @@
   box-sizing: border-box;
 }
 
+/* El atributo hidden pierde contra cualquier regla con display (por ejemplo
+   .campo { display: grid }): esto asegura que un elemento oculto no se vea. */
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   min-height: 100vh;

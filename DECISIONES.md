@@ -95,7 +95,7 @@ Registro de las decisiones importantes del proyecto: qué decidimos, qué altern
 - **Alternativas:** borrar la cuenta de Auth y el perfil.
 - **Por qué:** desde el navegador no se pueden borrar cuentas de otros usuarios en Auth (requiere Admin SDK). Además, borrar dejaría trámites e historial apuntando a alguien inexistente.
 
-## 14. Alta de usuarios desde la app con una segunda instancia de Firebase App (se implementa en la Fase 4)
+## 14. Alta de usuarios desde la app con una segunda instancia de Firebase App (implementada en la Fase 4)
 
 - **Problema:** con el SDK de cliente, `createUserWithEmailAndPassword` deja logueado al usuario recién creado y saca al admin de su sesión. Cloud Functions y el Admin SDK lo resolverían del lado del servidor, pero requieren el plan Blaze.
 - **Decisión:** crear una segunda instancia de Firebase App, solo para dar de alta usuarios:
@@ -221,3 +221,18 @@ Registro de las decisiones importantes del proyecto: qué decidimos, qué altern
   - Lo que puede hacer cada rol lo deciden `TRANSICIONES` y `firestore.rules`.
   - Un rol nuevo, o un permiso editado en la base, no cambiaría nada de eso: daría una falsa sensación de configuración, o habría que leer permisos de la base dentro de las reglas, con más lecturas por petición y más superficie de error.
   - Que el rol de cada usuario se valide contra la lista fija `ROLES` hace que perder un documento del catálogo no deje a nadie sin acceso.
+
+## 26. Alta de usuarios: contraseña inicial y alta interrumpida
+
+- **Decisión:**
+  - El admin carga una **contraseña inicial** (mínimo 8 caracteres) y se la comunica al usuario. Si el usuario la olvida, desde su ficha se le envía el mail de Firebase para elegir otra (`sendPasswordResetEmail`).
+  - El alta tiene dos pasos que no pueden ir juntos en una misma operación: la cuenta en Auth y el perfil en Firestore. Si el segundo falla, **reintentar el alta con el mismo email y la misma contraseña la completa**: el servicio comprueba la contraseña en la instancia secundaria y escribe el perfil que falta.
+- **Alternativas:**
+  - Invitación por mail, sin contraseña inicial.
+  - Una contraseña aleatoria que el admin no elige.
+  - Borrar la cuenta huérfana, que desde el navegador no se puede.
+- **Por qué:**
+  - Los usuarios de prueba tienen emails ficticios (`@bprosys.test`) a los que no llega ningún mail: con invitación por mail, la demo no se podría probar.
+  - Comprobar la contraseña antes de completar un alta evita que alguien "adopte" una cuenta ajena que tenga ese email.
+  - Una cuenta sin perfil no puede hacer nada (decisión 14), así que el estado intermedio no es un riesgo de seguridad.
+- **Límite:** no se obliga a cambiar la contraseña inicial en el primer ingreso. Haría falta un campo más en el perfil y una pantalla de cambio de contraseña; queda como mejora.
