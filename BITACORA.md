@@ -403,3 +403,35 @@ Armamos la base de una app de permisos con arquitectura en capas (UI → servici
 ## Resumen de la Fase 2
 
 Construimos el flujo completo Solicitar → Aprobar → Gestionar RH de punta a punta: crear con adjuntos, devolver con motivo, corregir y reenviar, aprobar, completar o rechazar, notas e historial. La lógica del flujo vive en un módulo puro (`flujoSolicitud.js`) que interpreta la tabla de transiciones. Lo usan la app y el script de datos de prueba, y lo cubren 28 tests unitarios. Las escrituras son transacciones que validan contra el estado real del trámite, con número correlativo sin repeticiones. Reforzamos las reglas para que la trazabilidad sea obligatoria en las dos direcciones: ningún cambio se guarda sin su evento en el historial, y ningún evento puede mentir sobre el cambio (44 tests contra el emulador). En la interfaz, la pantalla de detalle no decide permisos: muestra un botón por cada acción que el servicio habilita y bloquea los campos según el rol y el estado.
+
+---
+
+## 2026-10-15 – Antes de la Fase 3 – Paso: registro de bugs y correcciones
+
+- **Qué hicimos:**
+  - Creamos `BUGS.md` para que ningún error pase desapercibido, y sumamos a `CLAUDE.md` la regla de corregir los bugs abiertos antes de cada fase.
+  - Registramos los 3 bugs de fases anteriores (ya resueltos) y 4 observaciones.
+  - Investigamos el `400` que había quedado sin explicar. Separamos lo que es comportamiento normal de Firebase (contraseña incorrecta, reconexión del SDK) de un bug real: consultas huérfanas al cerrar sesión con datos cargando.
+  - Corregimos ese bug y otro de experiencia de usuario (errores de formulario que no se ocultaban), sin romper nada.
+- **Archivos creados o modificados:**
+  - `BUGS.md`: registro con 5 bugs (todos resueltos) y 4 observaciones.
+  - `CLAUDE.md`: sección "Registro de bugs (BUGS.md)".
+  - `README.md`: `BUGS.md` en la estructura.
+  - `src/services/solicitudesServicio.js`: `errorParaUsuario()`, que reconoce errores que llegan después de cerrar sesión (BUG-004).
+  - `src/ui/pantallas/inicioPantalla.js` y `detalleSolicitudPantalla.js`: no dibujan si la pantalla ya fue reemplazada (BUG-004).
+  - `src/ui/pantallas/loginPantalla.js`, `nuevaSolicitudPantalla.js` y `detalleSolicitudPantalla.js`: los errores se ocultan al editar (BUG-005).
+- **Conceptos aprendidos:**
+  - **Bug vs. comportamiento esperado:** no todo lo rojo en la consola es un bug. El `400` de una contraseña incorrecta es la respuesta correcta del servidor. Hay que reproducir el problema e identificar la URL antes de "arreglar".
+  - **Petición huérfana:** una consulta que termina después de que el usuario ya cambió de pantalla o cerró sesión. Hay que comprobar si su resultado todavía tiene dónde mostrarse (`isConnected`).
+  - **Rama `fix/...`:** las correcciones se hacen aparte y se integran a `main` solo después de pasar todos los tests.
+  - **Test de regresión:** prueba que se agrega o repite para asegurar que un bug corregido no vuelva.
+- **Comandos usados:**
+  - `git switch -c fix/bugs-pre-fase-3`: rama para las correcciones.
+  - Reproducción en el navegador (Playwright), registrando respuestas ≥ 400, peticiones abortadas y mensajes de consola.
+  - `npm run seed` y `npm test`: datos limpios y 72 tests en verde.
+  - `git merge --no-ff fix/bugs-pre-fase-3`: integra las correcciones a `main`.
+- **Cómo probarlo:**
+  1. Entrá con cualquier usuario y tocá **Salir** enseguida: la consola (F12) no muestra advertencias de la app.
+  2. En **Nueva solicitud**, enviá vacío y después elegí un tipo: el error desaparece.
+  3. Recorré el flujo completo: todo sigue funcionando.
+- **Pendientes o dudas:** ninguno abierto. OBS-003 (caché) se verifica en el deploy de la Fase 6.

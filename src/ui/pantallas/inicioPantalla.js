@@ -64,11 +64,15 @@ export async function renderizarInicio(contenedor, usuario) {
 
   try {
     const { tareas, solicitudes } = await listarInicio();
+    // Si mientras cargaba el usuario navegó o cerró sesión, esta pantalla ya no está:
+    // no se dibuja sobre ella (BUGS.md · BUG-004).
+    if (!principal.isConnected) return;
     llenarSeccion(principal.querySelector('#seccionTareas'), 'Mis tareas pendientes', tareas, usuario,
       'No tenés tareas pendientes.');
     llenarSeccion(principal.querySelector('#seccionSolicitudes'), 'Mis solicitudes', solicitudes, usuario,
       'Todavía no participaste de ninguna solicitud.');
   } catch (error) {
+    if (!principal.isConnected) return;
     principal.querySelector('#seccionTareas').innerHTML =
       `<p class="mensaje-error">${escaparHtml(error.message)}</p>`;
     principal.querySelector('#seccionSolicitudes').remove();

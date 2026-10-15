@@ -85,6 +85,7 @@ export async function renderizarDetalleSolicitud(contenedor, usuario, { id }) {
   try {
     detalle = await obtenerDetalle(id);
   } catch (error) {
+    if (!principal.isConnected) return; // la pantalla ya fue reemplazada (BUGS.md · BUG-004)
     principal.innerHTML = `
       <section class="tarjeta tarjeta--ancha">
         <h1 class="titulo">No se pudo abrir la solicitud</h1>
@@ -93,6 +94,9 @@ export async function renderizarDetalleSolicitud(contenedor, usuario, { id }) {
       </section>`;
     return;
   }
+
+  // Si mientras cargaba el usuario navegó o cerró sesión, no se dibuja (BUGS.md · BUG-004).
+  if (!principal.isConnected) return;
 
   const { solicitud, historial, adjuntos, acciones, puedeAgregarSeguimiento, puedeCorregirDatos } = detalle;
 
@@ -315,8 +319,23 @@ async function ejecutarConEstado(boton, mensajeError, operacion, textoExito) {
   }
 }
 
+/**
+ * Oculta un mensaje de error en cuanto el usuario vuelve a editar (BUGS.md · BUG-005).
+ * @param {(HTMLElement|null)[]} elementos - Campos o formularios a observar.
+ * @param {HTMLElement|null} mensajeError
+ */
+function ocultarErrorAlEditar(elementos, mensajeError) {
+  if (!mensajeError) return;
+  for (const elemento of elementos.filter(Boolean)) {
+    elemento.addEventListener('input', () => { mensajeError.hidden = true; });
+    elemento.addEventListener('change', () => { mensajeError.hidden = true; });
+  }
+}
+
 function conectarAcciones(principal, solicitud, puedeCorregirDatos) {
   const mensajeError = principal.querySelector('#errorAccion');
+  // El error de una acción puede venir del comentario o de los datos corregidos (al reenviar).
+  ocultarErrorAlEditar([principal.querySelector('#comentarioAccion'), principal.querySelector('#formDatos')], mensajeError);
   for (const boton of principal.querySelectorAll('[data-accion]')) {
     boton.addEventListener('click', () => {
       const accion = boton.dataset.accion;
@@ -350,6 +369,7 @@ function leerFormularioDatos(principal) {
 function conectarNotas(principal, solicitud) {
   const formulario = principal.querySelector('#formNota');
   if (!formulario) return;
+  ocultarErrorAlEditar([formulario], principal.querySelector('#errorNota'));
   formulario.addEventListener('submit', (evento) => {
     evento.preventDefault();
     ejecutarConEstado(
@@ -373,9 +393,10 @@ function conectarAdjuntos(principal, solicitud, adjuntos) {
 
   const formulario = principal.querySelector('#formAdjunto');
   if (!formulario) return;
+  const mensajeError = principal.querySelector('#errorAdjunto');
+  ocultarErrorAlEditar([formulario], mensajeError);
   formulario.addEventListener('submit', (evento) => {
     evento.preventDefault();
-    const mensajeError = principal.querySelector('#errorAdjunto');
     const [archivo] = formulario.elements.archivo.files;
     if (!archivo) {
       mensajeError.textContent = 'Elegí un archivo.';

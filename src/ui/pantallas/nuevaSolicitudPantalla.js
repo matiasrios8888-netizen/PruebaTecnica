@@ -118,6 +118,10 @@ export function renderizarNuevaSolicitud(contenedor, usuario) {
   });
   campos.fechaFin.addEventListener('change', actualizarAyudas);
 
+  // Al corregir cualquier campo se oculta el error anterior (BUGS.md · BUG-005).
+  formulario.addEventListener('input', () => { mensajeError.hidden = true; });
+  formulario.addEventListener('change', () => { mensajeError.hidden = true; });
+
   campos.motivo.addEventListener('input', () => {
     principal.querySelector('#contadorMotivo').textContent = String(campos.motivo.value.length);
   });

@@ -75,6 +75,23 @@ async function prepararArchivos(archivos) {
   );
 }
 
+/**
+ * Convierte un error en un mensaje para el usuario.
+ * Si cuando llega el error ya no hay sesión (el usuario cerró sesión con una
+ * consulta en curso → Firestore responde "permission-denied"), no es un problema
+ * de permisos sino una consulta huérfana: se informa "sesión terminada" sin
+ * ensuciar la consola. Ver BUGS.md · BUG-004.
+ * @param {unknown} error
+ * @param {string} mensajePorDefecto
+ * @returns {ErrorAplicacion}
+ */
+function errorParaUsuario(error, mensajePorDefecto) {
+  if (!obtenerUsuarioActual()) {
+    return new ErrorAplicacion('Tu sesión terminó. Volvé a iniciar sesión.', 'sinSesion', error);
+  }
+  return aErrorAplicacion(error, mensajePorDefecto);
+}
+
 /** Ordena solicitudes de la más reciente a la más vieja (por última actualización). */
 const porActualizacionDescendente = (a, b) =>
   (b.fechaActualizacion?.toMillis?.() ?? 0) - (a.fechaActualizacion?.toMillis?.() ?? 0);
@@ -144,7 +161,7 @@ export async function crearSolicitud(datosFormulario, archivos = []) {
       };
     });
   } catch (error) {
-    throw aErrorAplicacion(error, 'No se pudo crear la solicitud. Volvé a intentar.');
+    throw errorParaUsuario(error, 'No se pudo crear la solicitud. Volvé a intentar.');
   }
 }
 
@@ -197,7 +214,7 @@ export async function obtenerDetalle(id) {
       puedeCorregirDatos: puedeCorregirDatos(solicitud, usuario),
     };
   } catch (error) {
-    throw aErrorAplicacion(error, 'No se pudo cargar la solicitud.');
+    throw errorParaUsuario(error, 'No se pudo cargar la solicitud.');
   }
 }
 
@@ -219,7 +236,7 @@ export async function listarInicio() {
       solicitudes: participa.sort(porActualizacionDescendente),
     };
   } catch (error) {
-    throw aErrorAplicacion(error, 'No se pudieron cargar tus solicitudes.');
+    throw errorParaUsuario(error, 'No se pudieron cargar tus solicitudes.');
   }
 }
 
@@ -274,7 +291,7 @@ export async function ejecutarAccion(id, accion, { comentario = '', datosCorregi
       return { datos: { ...correccion, ...cambios }, evento };
     });
   } catch (error) {
-    throw aErrorAplicacion(error, 'No se pudo completar la acción.');
+    throw errorParaUsuario(error, 'No se pudo completar la acción.');
   }
 }
 
@@ -293,7 +310,7 @@ export async function agregarNota(id, texto) {
       evento: construirEventoNota(solicitud, usuario, texto),
     }));
   } catch (error) {
-    throw aErrorAplicacion(error, 'No se pudo guardar la nota.');
+    throw errorParaUsuario(error, 'No se pudo guardar la nota.');
   }
 }
 
@@ -314,6 +331,6 @@ export async function agregarAdjunto(id, archivo) {
       adjuntos: [{ adjunto: { ...adjunto, subidoPor: usuario.id, subidoPorNombre: usuario.nombre } }],
     }));
   } catch (error) {
-    throw aErrorAplicacion(error, 'No se pudo adjuntar el archivo.');
+    throw errorParaUsuario(error, 'No se pudo adjuntar el archivo.');
   }
 }
