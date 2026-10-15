@@ -165,3 +165,25 @@ Registro de las decisiones importantes del proyecto: qué decidimos, qué altern
 - **Decisión:** al abrir una solicitud inexistente o ajena se muestra "La solicitud no existe o no tenés permiso para verla".
 - **Alternativas:** mensajes distintos para cada caso.
 - **Por qué:** Firestore responde igual en los dos casos (las reglas rechazan leer un documento inexistente). Distinguirlos revelaría qué ids existen.
+
+## 22. Bandeja: consulta por pestaña en Firestore + filtros, orden y búsqueda en el navegador
+
+- **Decisión:**
+  - Cada pestaña se resuelve con **una** consulta ordenada por `fechaActualizacion` y con tope de 200: Pendientes (`asignadoA == yo`), Enviadas (`participantes` contiene a yo, menos las que tengo asignadas) y Todas (solo RH y admin). "Nuevas" se deriva de Pendientes, sin consulta extra.
+  - Filtros, orden y búsqueda se aplican en el navegador (`bandeja.js`, puro y testeado).
+  - Las consultas usan dos **índices compuestos** versionados en `firestore.indexes.json`.
+  - Cada pestaña es una ruta (`#/bandeja/nuevas`).
+- **Alternativas:** filtrar y ordenar todo en Firestore; un servicio de búsqueda externo (Algolia o Typesense).
+- **Por qué:**
+  - Firestore no tiene búsqueda de texto, y cada combinación de filtro y orden necesitaría su propio índice compuesto.
+  - Con los volúmenes de una empresa, filtrar unas decenas o cientos de solicitudes en el navegador es instantáneo y no consume lecturas.
+  - La consulta por pestaña respeta la seguridad: filtra por los campos que revisan las reglas.
+  - Tener la pestaña en la URL hace que funcionen "Atrás" y los links compartidos.
+- **Costo aceptado:** con más de 200 solicitudes por lista solo se ven las más recientes (la pantalla lo avisa). La mejora sería paginar con `startAfter`.
+
+## 23. Control de campos por rol con una matriz de configuración
+
+- **Decisión:** `MATRIZ_CAMPOS` (en `constantes.js`) define, para cada campo, quién lo edita (estado, rol, si debe ser el asignado o el solicitante, y con qué acción se guarda) y quién lo ve. `accesoACampos()` la aplica a un usuario y devuelve editable / lectura / oculto, y la pantalla se dibuja con eso. Se sumaron los campos de gestión RH `referenciaRh` (obligatoria para completar) y `diasDescontados` (0 a `cantidadDias`).
+- **Alternativas:** `if (rol === ...)` repartidos en las pantallas; formularios distintos por rol.
+- **Por qué:** es una sola fuente de verdad, fácil de leer y de extender (sumar un campo o cambiar quién lo edita no toca la pantalla), y se testea como una función pura. Las reglas de Firestore replican la parte de **edición**.
+- **Límite conocido:** Firestore controla la lectura por documento, no por campo. Un usuario que puede leer una solicitud técnicamente puede ver todos sus campos aunque la pantalla los oculte. Por eso estos campos no guardan datos sensibles. Si los hubiera, irían en un documento aparte con su propia regla de lectura.

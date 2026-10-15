@@ -612,3 +612,39 @@ Construimos el flujo completo Solicitar → Aprobar → Gestionar RH de punta a 
   - `git merge --no-ff fix/BUG-007-desborde-columna-acciones` (en `main`).
 - **Cómo probarlo:** abrí el detalle de una solicitud con acciones y achicá la ventana del navegador de a poco: la columna derecha nunca sobresale. En modo celular (F12 → ícono de dispositivo móvil) la tabla del inicio se desplaza dentro de su recuadro, y la página no se corre de costado.
 - **Pendientes o dudas:** ninguno. Siguiente: traer `main` (con BUG-006 y BUG-007) a `feature/bandeja` y terminar la Fase 3.
+
+---
+
+## 2026-10-15 – Fase 3 – Paso: integración de correcciones, prueba final y cierre
+
+- **Qué hicimos:**
+  - Trajimos a `feature/bandeja` las correcciones BUG-006 y BUG-007 que ya estaban en `main`, y resolvimos 3 conflictos de merge quedándonos con las dos versiones.
+  - Hicimos una prueba completa de la fase con los 4 roles, documentamos las decisiones 22 y 23 y cerramos la fase con el merge a `main`.
+- **Archivos creados o modificados:**
+  - `BITACORA.md`, `README.md` y `scripts/package.json`: conflictos resueltos (entradas de las dos ramas, filas del README de las dos ramas, los comandos `seed:restablecer-claves` y `test:unitarios`).
+  - `README.md`: Fase 3 completa, qué puede hacer cada rol (bandeja, matriz, gestión RH) y estructura actualizada.
+  - `DECISIONES.md`: 22 (consulta por pestaña + filtrado en el navegador + índices) y 23 (matriz de control de campos por rol, con su límite: Firestore no oculta campos sueltos).
+- **Conceptos aprendidos:**
+  - **Conflicto de merge:** cuando dos ramas cambian las mismas líneas, git marca el archivo con `<<<<<<<`, `=======` y `>>>>>>>`. Se edita para quedarse con lo correcto (acá, las dos cosas), se borran las marcas y se commitea. Antes de commitear se verifica que todo siga funcionando (106 tests).
+  - **Actualizar una rama con `main`:** `git merge main` dentro de la rama de trabajo trae las correcciones antes de integrarla. Así el merge final a `main` no tiene sorpresas.
+  - **Sincronización en tests de interfaz:** `waitForURL` termina cuando cambia la URL, pero el navegador redibuja recién en el evento `hashchange`. Hay que esperar una condición de la pantalla nueva (por ejemplo, que la pestaña activa sea la correcta), no la URL. Un test que falla "a veces" casi siempre es esto, no un bug de la app.
+- **Comandos usados:**
+  - `git merge main` (en `feature/bandeja`), resolución de conflictos y `git commit --no-edit`.
+  - `npm test` (54 + 52) y `npm run seed`.
+  - Prueba en el navegador del flujo completo:
+    1. Ana crea `SOL-0011` (enfermedad con certificado) → aparece en sus Enviadas.
+    2. Carlos la ve en Nuevas (3) y la aprueba → su bandeja baja a Pendientes 3 / Nuevas 2.
+    3. Laura la completa con referencia `LIQ-2026-1101` y 3 días.
+    4. Ana la ve completada, con la gestión RH en solo lectura y 4 eventos en el historial.
+    5. Martín filtra Todas por Completada → `SOL-0011`, `SOL-0009`, `SOL-0008` (4 de 4 intentos).
+
+    La bandeja no tiene scroll horizontal en 1440, 1024, 800, 390 ni 320 px, y la consola no registró errores.
+  - `git merge --no-ff feature/bandeja` (en `main`).
+- **Cómo probarlo:** Live Server (Ctrl + F5) y repetir el recorrido de arriba con los usuarios de prueba.
+- **Pendientes o dudas:** `BUGS.md` tiene 0 abiertos. La paginación de la bandeja (más de 200 solicitudes por lista) queda como mejora.
+
+---
+
+## Resumen de la Fase 3
+
+Construimos la bandeja de tareas: pestañas Pendientes, Nuevas y Enviadas (y Todas para RH y admin) con contadores, búsqueda sin tildes ni mayúsculas, filtros por estado, etapa, tipo y rango de fechas, y orden. Cada pestaña es una consulta a Firestore con su índice compuesto, y filtrar y buscar ocurre en el navegador con lógica pura y testeada. El control de campos por rol pasó a ser una matriz de configuración que decide, campo por campo, quién edita y quién ve según el rol y el estado. La sumamos con los datos de gestión RH, que solo carga el RH asignado al completar, y las reglas de Firestore exigen lo mismo. Durante la fase detectamos dos bugs en código ya publicado (el seed cerraba sesiones y desbordes de diseño). Los corregimos cada uno en su propia rama desde `main`, con tests de regresión, y los integramos a la fase resolviendo los conflictos de merge. Terminamos con 106 tests automáticos en verde y 0 bugs abiertos.
