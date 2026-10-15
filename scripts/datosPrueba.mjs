@@ -4,8 +4,9 @@
  * Archivo: scripts/datosPrueba.mjs
  *
  * Responsabilidad:
- *   Describir QUÉ se carga en Firebase: usuarios de prueba, descripción de
- *   los roles y 10 solicitudes escritas como un "guion" de acciones.
+ *   Describir QUÉ se carga en Firebase: usuarios de prueba y 10 solicitudes
+ *   escritas como un "guion" de acciones. (El catálogo de roles sale de
+ *   constantes.js: NOMBRES_ROL, DESCRIPCIONES_ROL y PERMISOS_POR_ROL.)
  *   CÓMO se carga (y la validación de cada paso) está en scripts/seed.mjs.
  *
  * Depende de: src/config/constantes.js
@@ -37,8 +38,10 @@ export const PASO_ADJUNTO = 'adjunto';
 export const PASSWORD_PRUEBA = process.env.SEED_PASSWORD ?? 'Bprosys2026!';
 
 /**
- * Usuarios de prueba, uno por rol. La clave de cada uno es su rol.
+ * Usuarios de prueba. La clave identifica a cada uno en los guiones: los 4
+ * principales (uno por rol) usan su rol como clave.
  * "supervisor" indica la clave del usuario que aprueba sus solicitudes.
+ * "activo: false" = dado de baja (baja lógica). Si no se indica, está activo.
  */
 export const USUARIOS_PRUEBA = {
   [ROLES.INICIADOR]: {
@@ -69,14 +72,23 @@ export const USUARIOS_PRUEBA = {
     area: 'Sistemas',
     supervisor: null,
   },
-};
-
-/** Descripción de cada rol para la colección "roles". */
-export const DESCRIPCIONES_ROL = {
-  [ROLES.INICIADOR]: 'Crea solicitudes de permiso, adjunta documentación y corrige las devueltas',
-  [ROLES.SUPERVISOR]: 'Aprueba, devuelve o rechaza las solicitudes de su equipo',
-  [ROLES.RH]: 'Gestiona en Recursos Humanos las solicitudes aprobadas y consulta reportes',
-  [ROLES.ADMIN]: 'Administra usuarios y roles, y consulta todas las solicitudes y reportes',
+  // Para el mantenimiento (Fase 4): una supervisora sin equipo activo (se puede
+  // dar de baja) y un iniciador dado de baja (se puede reactivar).
+  sofia: {
+    nombre: 'Sofía Díaz',
+    email: 'sofia.diaz@bprosys.test',
+    rol: ROLES.SUPERVISOR,
+    area: 'Comercial',
+    supervisor: null,
+  },
+  pedro: {
+    nombre: 'Pedro Ruiz',
+    email: 'pedro.ruiz@bprosys.test',
+    rol: ROLES.INICIADOR,
+    area: 'Comercial',
+    supervisor: 'sofia',
+    activo: false,
+  },
 };
 
 /**

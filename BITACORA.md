@@ -648,3 +648,40 @@ Construimos el flujo completo Solicitar → Aprobar → Gestionar RH de punta a 
 ## Resumen de la Fase 3
 
 Construimos la bandeja de tareas: pestañas Pendientes, Nuevas y Enviadas (y Todas para RH y admin) con contadores, búsqueda sin tildes ni mayúsculas, filtros por estado, etapa, tipo y rango de fechas, y orden. Cada pestaña es una consulta a Firestore con su índice compuesto, y filtrar y buscar ocurre en el navegador con lógica pura y testeada. El control de campos por rol pasó a ser una matriz de configuración que decide, campo por campo, quién edita y quién ve según el rol y el estado. La sumamos con los datos de gestión RH, que solo carga el RH asignado al completar, y las reglas de Firestore exigen lo mismo. Durante la fase detectamos dos bugs en código ya publicado (el seed cerraba sesiones y desbordes de diseño). Los corregimos cada uno en su propia rama desde `main`, con tests de regresión, y los integramos a la fase resolviendo los conflictos de merge. Terminamos con 106 tests automáticos en verde y 0 bugs abiertos.
+
+---
+
+## 2026-10-15 – Fase 4 – Paso: reglas de negocio, reglas de Firestore y datos para el mantenimiento
+
+- **Qué hicimos:**
+  - Definimos las reglas del mantenimiento antes de dibujar pantallas. Son las decisiones 24 y 25.
+  - **Baja y cambio de rol bloqueados** mientras el usuario:
+    - sea el admin que opera;
+    - participe en trámites abiertos;
+    - sea supervisor de colaboradores activos;
+    - sea el último RH activo.
+  - **Roles:** son los 4 del sistema. El admin edita el nombre y la descripción, los permisos son de solo lectura, y "crear rol" solo vuelve a crear uno de los 4 si falta.
+  - Toda la lógica quedó en módulos puros con tests. Las reglas de Firestore suman lo que el servidor sí puede garantizar.
+  - Los datos de prueba suman 2 usuarios para probar el mantenimiento.
+- **Archivos creados o modificados:**
+  - `src/config/constantes.js`: `LIMITES_USUARIO`, `LIMITES_ROL`, `NOMBRES_PERMISO`, `DESCRIPCIONES_ROL` (antes estaba en `datosPrueba.mjs`), filtros del listado y `OPERACIONES_USUARIO`.
+  - `src/services/gestionUsuarios.js` (nuevo, puro): valida los datos de un usuario, calcula los motivos de bloqueo, valida la reactivación y filtra el listado.
+  - `src/services/gestionRoles.js` (nuevo, puro): arma el catálogo de los 4 roles, detecta los faltantes, valida nombre y descripción y prepara la creación de un rol faltante.
+  - `firestore.rules`:
+    - **usuarios:** el área es obligatoria; el supervisor tiene que ser coherente (solo el iniciador tiene, existe, es supervisor y está activo, y no es él mismo); un usuario nuevo empieza activo; el admin no puede darse de baja ni cambiarse el rol.
+    - **roles:** solo las 4 claves del sistema; los permisos no se editan; solo se crea un rol con sus permisos de fábrica.
+  - `scripts/tests/gestionUsuarios.test.mjs` (20 tests) y `gestionRoles.test.mjs` (8) (nuevos); `reglas.test.mjs`: +17 tests de usuarios y roles.
+  - `scripts/datosPrueba.mjs` y `seed.mjs`: Sofía Díaz (supervisora sin equipo activo) y Pedro Ruiz (iniciador dado de baja); los roles se escriben sin `activo`.
+  - `src/data/modelos.js` y `docs/MODELO_DATOS.md`: el modelo de `Rol` sin `activo` y la regla del supervisor.
+  - `DECISIONES.md`: decisiones 24 y 25.
+- **Conceptos aprendidos:**
+  - **Lo que las reglas pueden y no pueden validar:** las reglas ven un documento por vez, y pueden leer otros con `get()` o `exists()`, pero no pueden contar ni consultar colecciones. Por eso "¿tiene trámites abiertos?" lo decide el servicio, y "¿su supervisor está activo?" lo deciden las dos capas.
+  - **Operador ternario en las reglas:** `d.rol == 'iniciador' ? (condiciones del iniciador) : d.supervisorId == null` aplica una condición distinta según el rol.
+  - **Tests que vigilan una copia:** los tests de reglas importan `PERMISOS_POR_ROL` desde `constantes.js`. Si la copia que está en `firestore.rules` se desincroniza, fallan.
+- **Comandos usados:**
+  - `git switch -c feature/mantenimiento`: rama de la fase.
+  - `npm run test:unitarios`: 82 tests, 28 nuevos.
+  - `npm run test:reglas`: 69 tests, 17 nuevos.
+  - `npm run seed:simular`, después `firebase deploy --only firestore:rules` y `npm run seed`: se publicaron las reglas y se recargaron los datos (6 usuarios, roles sin `activo`).
+- **Cómo probarlo:** desde `scripts/`, correr `npm test`. Para comprobar que la baja lógica funciona, entrar con `pedro.ruiz@bprosys.test` / `Bprosys2026!`: tiene que aparecer "Tu usuario está dado de baja".
+- **Pendientes o dudas:** las pantallas de usuarios y roles se hacen en los pasos siguientes.

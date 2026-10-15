@@ -25,11 +25,11 @@ Perfil de cada persona. El **id del documento es el uid de Firebase Authenticati
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `nombre` | string | Nombre y apellido para mostrar. |
-| `email` | string | Email de login. No se edita después del alta (debe coincidir con Auth). |
+| `nombre` | string | Nombre y apellido para mostrar (hasta 100 caracteres). |
+| `email` | string | Email de login, en minúsculas. No se edita después del alta (debe coincidir con Auth). |
 | `rol` | string | `iniciador` \| `supervisor` \| `rh` \| `admin`. |
-| `supervisorId` | string \| null | uid del supervisor que aprueba sus solicitudes. |
-| `area` | string | Área o sector. |
+| `supervisorId` | string \| null | Solo el iniciador: uid del supervisor que aprueba sus solicitudes. Mientras el iniciador esté activo, su supervisor también tiene que estarlo. En los demás roles es `null`. |
+| `area` | string | Área o sector (obligatoria, hasta 60 caracteres). |
 | `activo` | boolean | `false` = baja lógica: no puede iniciar sesión ni operar. |
 | `fechaCreacion` | Timestamp | |
 | `fechaActualizacion` | Timestamp | |
@@ -49,21 +49,24 @@ Perfil de cada persona. El **id del documento es el uid de Firebase Authenticati
 
 ## 2. `roles/{clave}`
 
-Catálogo de roles para la gestión de roles (Fase 4). El id del documento es la clave del rol (`iniciador`, `supervisor`, `rh`, `admin`).
+Catálogo de los **4 roles del sistema**. El id del documento es la clave del rol (`iniciador`, `supervisor`, `rh`, `admin`).
+- El admin edita el nombre visible y la descripción.
+- Los permisos los define el flujo y no se editan.
+- No se pueden crear roles con otra clave. Solo se puede volver a crear uno de los 4 si falta, con sus permisos de fábrica (`PERMISOS_POR_ROL`). Ver DECISIONES.md #25.
+
+Si falta un documento, la app sigue funcionando: el rol de cada usuario se valida contra la lista fija `ROLES`, y el nombre se muestra con su valor de fábrica (`NOMBRES_ROL`).
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `nombre` | string | Nombre para mostrar. |
-| `descripcion` | string | Qué hace el rol en el flujo. |
-| `permisos` | string[] | Capacidades del rol (ver `PERMISOS` en constantes). |
-| `activo` | boolean | |
+| `nombre` | string | Nombre para mostrar (editable, hasta 60 caracteres). Se usa en toda la app. |
+| `descripcion` | string | Qué hace el rol en el flujo (editable, hasta 300 caracteres). |
+| `permisos` | string[] | Capacidades del rol (ver `PERMISOS` y `PERMISOS_POR_ROL` en constantes). Solo lectura. |
 
 ```json
 {
   "nombre": "Supervisor",
   "descripcion": "Aprueba, devuelve o rechaza las solicitudes de su equipo",
-  "permisos": ["solicitud.aprobar", "solicitud.devolver", "solicitud.rechazar"],
-  "activo": true
+  "permisos": ["solicitud.aprobar", "solicitud.devolver", "solicitud.rechazar"]
 }
 ```
 
