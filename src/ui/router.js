@@ -33,6 +33,19 @@ export const RUTA_BANDEJA_PESTANA = '#/bandeja/:pestana';
 export const RUTA_NUEVA_SOLICITUD = '#/solicitudes/nueva';
 export const RUTA_DETALLE_SOLICITUD = '#/solicitudes/:id';
 
+/** Mantenimiento (solo admin). */
+export const RUTA_USUARIOS = '#/usuarios';
+export const RUTA_NUEVO_USUARIO = '#/usuarios/nuevo';
+export const RUTA_FICHA_USUARIO = '#/usuarios/:id';
+export const RUTA_ROLES = '#/roles';
+
+/**
+ * Arma el hash de la ficha de un usuario.
+ * @param {string} id - uid del usuario.
+ * @returns {string} Ej: "#/usuarios/abc123".
+ */
+export const rutaFichaUsuario = (id) => `#/usuarios/${encodeURIComponent(id)}`;
+
 /**
  * Arma el hash de una pestaña de la bandeja.
  * @param {string} pestana - Una de PESTANAS_BANDEJA.

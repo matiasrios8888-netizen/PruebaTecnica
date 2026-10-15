@@ -670,7 +670,7 @@ Construimos la bandeja de tareas: pestañas Pendientes, Nuevas y Enviadas (y Tod
   - `firestore.rules`:
     - **usuarios:** el área es obligatoria; el supervisor tiene que ser coherente (solo el iniciador tiene, existe, es supervisor y está activo, y no es él mismo); un usuario nuevo empieza activo; el admin no puede darse de baja ni cambiarse el rol.
     - **roles:** solo las 4 claves del sistema; los permisos no se editan; solo se crea un rol con sus permisos de fábrica.
-  - `scripts/tests/gestionUsuarios.test.mjs` (20 tests) y `gestionRoles.test.mjs` (8) (nuevos); `reglas.test.mjs`: +17 tests de usuarios y roles.
+  - `scripts/tests/gestionUsuarios.test.mjs` (21 tests) y `gestionRoles.test.mjs` (7) (nuevos); `reglas.test.mjs`: +17 tests de usuarios y roles.
   - `scripts/datosPrueba.mjs` y `seed.mjs`: Sofía Díaz (supervisora sin equipo activo) y Pedro Ruiz (iniciador dado de baja); los roles se escriben sin `activo`.
   - `src/data/modelos.js` y `docs/MODELO_DATOS.md`: el modelo de `Rol` sin `activo` y la regla del supervisor.
   - `DECISIONES.md`: decisiones 24 y 25.
@@ -685,3 +685,39 @@ Construimos la bandeja de tareas: pestañas Pendientes, Nuevas y Enviadas (y Tod
   - `npm run seed:simular`, después `firebase deploy --only firestore:rules` y `npm run seed`: se publicaron las reglas y se recargaron los datos (6 usuarios, roles sin `activo`).
 - **Cómo probarlo:** desde `scripts/`, correr `npm test`. Para comprobar que la baja lógica funciona, entrar con `pedro.ruiz@bprosys.test` / `Bprosys2026!`: tiene que aparecer "Tu usuario está dado de baja".
 - **Pendientes o dudas:** las pantallas de usuarios y roles se hacen en los pasos siguientes.
+
+## 2026-10-15 – Fase 4 – Paso: listado de usuarios para el administrador
+
+- **Qué hicimos:**
+  - El admin tiene un nuevo enlace "Usuarios" en el menú, con el listado de todos los colaboradores: nombre, email, rol, área, supervisor y estado.
+  - Se puede buscar por nombre, email o área, sin importar tildes ni mayúsculas, y filtrar por rol y por estado (activos o dados de baja).
+  - Los datos se leen una vez y los filtros solo redibujan la tabla.
+  - Antes de la pantalla hicimos un refactor chico: `usuarioRequerido` y `errorParaUsuario` (la protección del BUG-004) pasaron de `solicitudesServicio.js` a `authServicio.js` para reutilizarlos. `usuarioRequerido` ahora además puede exigir un rol.
+- **Archivos creados o modificados:**
+  - `src/services/authServicio.js`: exporta `usuarioRequerido(roles)` y `errorParaUsuario`.
+  - `src/services/solicitudesServicio.js`: usa las utilidades de `authServicio.js` en lugar de sus copias locales.
+  - `src/services/usuariosServicio.js` (nuevo): casos de uso del mantenimiento; por ahora `cargarUsuarios`, solo para el admin.
+  - `src/data/usuariosRepositorio.js`: `listarUsuarios()`, ordenado por nombre.
+  - `src/ui/pantallas/usuariosPantalla.js` (nuevo): el listado con búsqueda y filtros.
+  - `src/ui/componentes/marco.js`: enlaces del menú por rol ("Nueva solicitud" para el iniciador, "Usuarios" para el admin). La sección actual se marca también en sus subrutas.
+  - `src/ui/router.js`: rutas del mantenimiento (`#/usuarios`, `#/usuarios/nuevo`, `#/usuarios/:id`, `#/roles`).
+  - `src/main.js`: registra `#/usuarios`, restringida al rol admin.
+  - `src/ui/utils/html.js`: `htmlOpciones()`, que antes era una función local de la bandeja, para reutilizarla en los formularios.
+  - `src/ui/pantallas/bandejaPantalla.js`: usa `htmlOpciones()`.
+- **Conceptos aprendidos:**
+  - **Refactor:** cambiar la estructura del código sin cambiar lo que hace. Acá movimos dos funciones a un lugar compartido para no copiarlas en cada servicio nuevo. Se verifica que todo siga igual: la bandeja carga como antes.
+  - **Defensa en capas:** el mantenimiento se protege en cuatro lugares:
+    1. el menú no muestra el enlace;
+    2. el router redirige a otro rol;
+    3. el servicio exige el rol admin;
+    4. firestore.rules solo deja escribir al admin.
+
+    Solo la última es seguridad real. Las otras evitan pantallas y llamadas inútiles.
+- **Comandos usados:**
+  - Un servidor local temporal sin caché y una prueba en el navegador:
+    - Carlos no ve "Usuarios", y `#/usuarios` lo lleva a la bandeja.
+    - Martín ve los 6 usuarios ("5 activos"): "GOMEZ" encuentra a Ana, el filtro Supervisor muestra a Carlos y Sofía, y Dados de baja muestra a Pedro.
+    - "Limpiar filtros" vuelve a los 6.
+    - Sin scroll horizontal en 390 y 320 px, y sin errores en la consola.
+- **Cómo probarlo:** entrar con `admin@bprosys.test` / `Bprosys2026!` → menú "Usuarios" → probar la búsqueda y los filtros. Entrar con otro rol: el enlace no aparece y la ruta `#/usuarios` redirige a la bandeja.
+- **Pendientes o dudas:** el alta, la ficha y los roles se hacen en los pasos siguientes. Hasta entonces, el enlace de cada fila lleva a una ruta que todavía no existe, que vuelve a la bandeja.

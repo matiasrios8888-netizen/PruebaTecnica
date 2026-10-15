@@ -10,6 +10,8 @@
  *   - Impedir el ingreso de usuarios sin perfil o dados de baja (activo = false).
  *   - Traducir los errores de Firebase a mensajes claros en español.
  *   - Mantener el perfil del usuario logueado disponible para el resto de la app.
+ *   - Dar a los demás servicios el usuario requerido (con control de rol) y la
+ *     traducción de errores que tiene en cuenta si la sesión sigue abierta.
  *
  * Depende de: src/data/authRepositorio.js, src/data/usuariosRepositorio.js,
  *   src/services/errores.js
@@ -18,7 +20,7 @@
 
 import { autenticar, desautenticar, escucharCambiosDeSesion } from '../data/authRepositorio.js';
 import { obtenerUsuarioPorId } from '../data/usuariosRepositorio.js';
-import { ErrorAplicacion } from './errores.js';
+import { ErrorAplicacion, aErrorAplicacion } from './errores.js';
 
 /** @typedef {import('../data/modelos.js').Usuario} Usuario */
 
@@ -104,6 +106,38 @@ export async function cerrarSesion() {
  */
 export function obtenerUsuarioActual() {
   return usuarioActual;
+}
+
+/**
+ * Usuario logueado, para el inicio de cada caso de uso de los servicios.
+ * @param {string[]|null} [roles] - Si se indica, solo esos roles pueden continuar.
+ * @returns {Usuario}
+ * @throws {ErrorAplicacion} "sinSesion" si no hay sesión, "sinPermiso" si su rol no está permitido.
+ */
+export function usuarioRequerido(roles = null) {
+  if (!usuarioActual) throw new ErrorAplicacion('Tu sesión terminó. Volvé a iniciar sesión.', 'sinSesion');
+  // 🔒 SEGURIDAD: control de rol en el servicio; firestore.rules lo vuelve a controlar en el servidor.
+  if (roles && !roles.includes(usuarioActual.rol)) {
+    throw new ErrorAplicacion('No tenés permiso para realizar esta acción.', 'sinPermiso');
+  }
+  return usuarioActual;
+}
+
+/**
+ * Convierte un error en un mensaje para el usuario.
+ * Si cuando llega el error ya no hay sesión (el usuario cerró sesión con una
+ * consulta en curso → Firestore responde "permission-denied"), no es un problema
+ * de permisos sino una consulta huérfana: se informa "sesión terminada" sin
+ * ensuciar la consola. Ver BUGS.md · BUG-004.
+ * @param {unknown} error
+ * @param {string} mensajePorDefecto
+ * @returns {ErrorAplicacion}
+ */
+export function errorParaUsuario(error, mensajePorDefecto) {
+  if (!usuarioActual) {
+    return new ErrorAplicacion('Tu sesión terminó. Volvé a iniciar sesión.', 'sinSesion', error);
+  }
+  return aErrorAplicacion(error, mensajePorDefecto);
 }
 
 /**

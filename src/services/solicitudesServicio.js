@@ -30,9 +30,9 @@ import {
 import { armarPestanas, pestanasVisibles } from './bandeja.js';
 import * as repositorio from '../data/solicitudesRepositorio.js';
 import { obtenerUsuarioPorId, listarUsuariosPorRol } from '../data/usuariosRepositorio.js';
-import { obtenerUsuarioActual } from './authServicio.js';
+import { usuarioRequerido, errorParaUsuario } from './authServicio.js';
 import { leerComoBase64 } from './archivos.js';
-import { ErrorAplicacion, aErrorAplicacion } from './errores.js';
+import { ErrorAplicacion } from './errores.js';
 import {
   accionesDisponibles,
   calcularTransicion,
@@ -53,17 +53,6 @@ import {
 // -------------------------------------------------------------
 
 /**
- * Usuario logueado; falla si no hay sesión.
- * @returns {Usuario}
- * @throws {ErrorAplicacion}
- */
-function usuarioRequerido() {
-  const usuario = obtenerUsuarioActual();
-  if (!usuario) throw new ErrorAplicacion('Tu sesión terminó. Volvé a iniciar sesión.', 'sinSesion');
-  return usuario;
-}
-
-/**
  * Valida y lee archivos del navegador para guardarlos como adjuntos.
  * @param {File[]} archivos
  * @returns {Promise<{ nombreArchivo: string, tipoMime: string, tamanoBytes: number, contenidoBase64: string }[]>}
@@ -82,22 +71,6 @@ async function prepararArchivos(archivos) {
   );
 }
 
-/**
- * Convierte un error en un mensaje para el usuario.
- * Si cuando llega el error ya no hay sesión (el usuario cerró sesión con una
- * consulta en curso → Firestore responde "permission-denied"), no es un problema
- * de permisos sino una consulta huérfana: se informa "sesión terminada" sin
- * ensuciar la consola. Ver BUGS.md · BUG-004.
- * @param {unknown} error
- * @param {string} mensajePorDefecto
- * @returns {ErrorAplicacion}
- */
-function errorParaUsuario(error, mensajePorDefecto) {
-  if (!obtenerUsuarioActual()) {
-    return new ErrorAplicacion('Tu sesión terminó. Volvé a iniciar sesión.', 'sinSesion', error);
-  }
-  return aErrorAplicacion(error, mensajePorDefecto);
-}
 
 // -------------------------------------------------------------
 // Crear

@@ -11,7 +11,7 @@
  * =============================================================
  */
 
-import { db, doc, getDoc, getDocs, collection, query, where } from '../config/firebase.js';
+import { db, doc, getDoc, getDocs, collection, query, where, orderBy } from '../config/firebase.js';
 import { COLECCIONES } from '../config/constantes.js';
 
 /** @typedef {import('./modelos.js').Usuario} Usuario */
@@ -27,6 +27,17 @@ export async function obtenerUsuarioPorId(uid) {
   const snapshot = await getDoc(doc(db, COLECCIONES.USUARIOS, uid));
   if (!snapshot.exists()) return null;
   return /** @type {Usuario} */ ({ id: snapshot.id, ...snapshot.data() });
+}
+
+/**
+ * Lista todos los usuarios (activos e inactivos), ordenados por nombre.
+ * Es el directorio de la empresa: alcanza con una lectura para el mantenimiento.
+ * @returns {Promise<Usuario[]>}
+ * @throws {import('https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js').FirebaseError}
+ */
+export async function listarUsuarios() {
+  const resultado = await getDocs(query(collection(db, COLECCIONES.USUARIOS), orderBy('nombre')));
+  return resultado.docs.map((d) => /** @type {Usuario} */ ({ id: d.id, ...d.data() }));
 }
 
 /**
