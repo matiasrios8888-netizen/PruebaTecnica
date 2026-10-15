@@ -1,0 +1,13 @@
+{
+  "name": "permisos-bprosys-scripts",
+  "private": true,
+  "description": "Scripts de mantenimiento que corren en Node (no forman parte del sitio publicado).",
+  "type": "module",
+  "scripts": {
+    "seed": "node seed.mjs",
+    "seed:simular": "node seed.mjs --simular"
+  },
+  "dependencies": {
+    "firebase-admin": "14.5.0"
+  }
+}

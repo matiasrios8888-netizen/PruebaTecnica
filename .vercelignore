@@ -1,0 +1,4 @@
+# Archivos que NO se publican en Vercel (el sitio solo necesita index.html y src/).
+
+# Scripts de Node (datos de prueba): no son parte del sitio y no deben exponerse.
+scripts/
