@@ -72,6 +72,8 @@ El desarrollador es junior y necesita **entender** todo lo que se construye (des
   - `src/config/` → configuración de Firebase y constantes.
   - `firestore.rules` → seguridad por rol en el servidor.
 - Script de datos de prueba en `scripts/` (Node + `firebase-admin`), con la clave de cuenta de servicio en `scripts/serviceAccountKey.json` (ignorada por git).
+- Cada cambio en `firestore.rules` va acompañado de tests en `scripts/tests/reglas.test.mjs`. Correr `npm run test:reglas` (desde `scripts/`) **antes** de publicar con `firebase deploy --only firestore:rules`.
+- Si cambia `src/config/constantes.js` (roles, estados, transiciones, tipos de permiso, límites), revisar la copia de esos valores en `firestore.rules`.
 
 ## Decisiones ya tomadas (detalle en DECISIONES.md)
 - Adjuntos guardados en Firestore como base64 (plan Spark, sin Storage), máximo **600 KB por archivo**, validado en el servicio y en las reglas.
