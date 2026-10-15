@@ -453,3 +453,27 @@ Construimos el flujo completo Solicitar → Aprobar → Gestionar RH de punta a 
   - `git merge --no-ff docs/proceso-correccion-bugs`: integra el cambio a `main`.
 - **Cómo probarlo:** leer la sección "Registro de bugs" de `CLAUDE.md` y "Cómo se usa" de `BUGS.md`.
 - **Pendientes o dudas:** ninguno. Siguiente: aprobación del plan de la Fase 3.
+
+---
+
+## 2026-10-15 – Fase 3 – Paso: consultas por pestaña e índices compuestos
+
+- **Qué hicimos:** creamos la rama `feature/bandeja` (con 0 bugs abiertos en `BUGS.md`, como pide la regla). Preparamos las consultas de las pestañas de la bandeja, ordenadas por última actualización y con tope de 200, y declaramos y publicamos los dos **índices compuestos** que necesitan.
+- **Archivos creados o modificados:**
+  - `src/data/solicitudesRepositorio.js`: `consultarBandeja()` (orden + tope); `listarAsignadasA` y `listarDondeParticipa` ordenadas; `listarTodas()` nueva (solo RH y admin).
+  - `firestore.indexes.json`: índices `(asignadoA, fechaActualizacion desc)` y `(participantes CONTAINS, fechaActualizacion desc)`.
+  - `src/config/constantes.js`: `LIMITE_BANDEJA = 200`.
+  - `src/config/firebase.js`: reexporta `limit`.
+  - `scripts/tests/reglas.test.mjs`: 2 tests nuevos (consultas ordenadas de cada pestaña; "Todas" permitida a RH y admin, prohibida al supervisor) → 46 tests.
+- **Conceptos aprendidos:**
+  - **Índice:** Firestore responde todas las consultas desde listas ya ordenadas. Los índices de un solo campo los crea solo.
+  - **Índice compuesto:** hace falta cuando una consulta filtra por un campo y ordena por otro. Sin él, Firestore rechaza la consulta con `FAILED_PRECONDITION` y un link para crearlo. Los declaramos en `firestore.indexes.json` para que queden versionados.
+  - **Construcción de índices:** después de publicarlos, Firestore tarda unos minutos en construirlos. Mientras tanto las consultas fallan, como comprobamos con un script.
+  - **Tope (`limit`):** evita traer miles de documentos de golpe. Si se alcanza, la pantalla lo avisa (paginación queda como mejora).
+- **Comandos usados:**
+  - `git switch -c feature/bandeja` y `git push -u origin feature/bandeja`: rama de la fase.
+  - `npm run test:reglas`: 46 tests en verde.
+  - `firebase deploy --only firestore:indexes`: publica los índices.
+  - Consulta con firebase-admin: confirma el `FAILED_PRECONDITION` mientras se construyen.
+- **Cómo probarlo:** en la consola de Firebase → Firestore → **Índices** → pestaña "Compuesto": aparecen los dos índices, primero "Compilando" y después "Habilitado".
+- **Pendientes o dudas:** la pantalla de la bandeja se construye en los próximos pasos.

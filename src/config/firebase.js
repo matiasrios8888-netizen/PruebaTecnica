@@ -61,6 +61,7 @@ export {
   query,
   where,
   orderBy,
+  limit,
   runTransaction,
   updateDoc,
   serverTimestamp,

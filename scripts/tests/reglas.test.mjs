@@ -33,6 +33,8 @@ import {
   deleteDoc,
   query,
   where,
+  orderBy,
+  limit,
   writeBatch,
   serverTimestamp,
   Timestamp,
@@ -285,6 +287,21 @@ describe('solicitudes: lectura', () => {
     const db = comoUsuario('ini');
     await assertSucceeds(getDocs(query(collection(db, 'solicitudes'), where('participantes', 'array-contains', 'ini'))));
     await assertFails(getDocs(collection(db, 'solicitudes')));
+  });
+
+  test('pestaña "Todas": RH y admin consultan todo ordenado y con tope; el supervisor no', async () => {
+    const todas = (uid) =>
+      getDocs(query(collection(comoUsuario(uid), 'solicitudes'), orderBy('fechaActualizacion', 'desc'), limit(200)));
+    await assertSucceeds(todas('rh'));
+    await assertSucceeds(todas('admin'));
+    await assertFails(todas('sup'));
+  });
+
+  test('pestañas "Pendientes" y "Enviadas": consultas ordenadas con tope', async () => {
+    const db = comoUsuario('sup');
+    const orden = [orderBy('fechaActualizacion', 'desc'), limit(200)];
+    await assertSucceeds(getDocs(query(collection(db, 'solicitudes'), where('asignadoA', '==', 'sup'), ...orden)));
+    await assertSucceeds(getDocs(query(collection(db, 'solicitudes'), where('participantes', 'array-contains', 'sup'), ...orden)));
   });
 
   test('el supervisor consulta sus pendientes por asignadoA', async () => {

@@ -28,11 +28,12 @@ import {
   query,
   where,
   orderBy,
+  limit,
   runTransaction,
   updateDoc,
   serverTimestamp,
 } from '../config/firebase.js';
-import { COLECCIONES, NUMERACION_SOLICITUD } from '../config/constantes.js';
+import { COLECCIONES, LIMITE_BANDEJA, NUMERACION_SOLICITUD } from '../config/constantes.js';
 
 /** @typedef {import('./modelos.js').Solicitud} Solicitud */
 /** @typedef {import('./modelos.js').EventoHistorial} EventoHistorial */
@@ -96,26 +97,48 @@ export async function listarAdjuntos(id) {
 }
 
 /**
- * Solicitudes asignadas a un usuario (sus tareas).
- * 🔒 SEGURIDAD: filtra por "asignadoA", un campo que la regla de lectura revisa
- * (las reglas no son filtros: sin este where la consulta se rechaza).
- * @param {string} uid
+ * Ejecuta una consulta de la bandeja: más recientes primero, con tope de LIMITE_BANDEJA.
+ * @param {...import('https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js').QueryConstraint} filtros
  * @returns {Promise<Solicitud[]>}
  */
-export async function listarAsignadasA(uid) {
-  const resultado = await getDocs(query(coleccionSolicitudes(), where('asignadoA', '==', uid)));
+async function consultarBandeja(...filtros) {
+  const resultado = await getDocs(
+    query(coleccionSolicitudes(), ...filtros, orderBy('fechaActualizacion', 'desc'), limit(LIMITE_BANDEJA)),
+  );
   return resultado.docs.map(conId);
 }
 
 /**
- * Solicitudes en las que el usuario participa (las que creó o en las que intervino).
- * 🔒 SEGURIDAD: filtra por "participantes", un campo que la regla de lectura revisa.
+ * Solicitudes asignadas a un usuario (pestañas "Pendientes" y "Nuevas").
+ * 🔒 SEGURIDAD: filtra por "asignadoA", un campo que la regla de lectura revisa
+ * (las reglas no son filtros: sin este where la consulta se rechaza).
+ * ⚠️ IMPORTANTE: filtrar por asignadoA y ordenar por fechaActualizacion requiere
+ * el índice compuesto (asignadoA, fechaActualizacion) de firestore.indexes.json.
  * @param {string} uid
- * @returns {Promise<Solicitud[]>}
+ * @returns {Promise<Solicitud[]>} Más recientes primero.
  */
-export async function listarDondeParticipa(uid) {
-  const resultado = await getDocs(query(coleccionSolicitudes(), where('participantes', 'array-contains', uid)));
-  return resultado.docs.map(conId);
+export function listarAsignadasA(uid) {
+  return consultarBandeja(where('asignadoA', '==', uid));
+}
+
+/**
+ * Solicitudes en las que el usuario participa (base de la pestaña "Enviadas").
+ * 🔒 SEGURIDAD: filtra por "participantes", un campo que la regla de lectura revisa.
+ * ⚠️ IMPORTANTE: requiere el índice compuesto (participantes CONTAINS, fechaActualizacion).
+ * @param {string} uid
+ * @returns {Promise<Solicitud[]>} Más recientes primero.
+ */
+export function listarDondeParticipa(uid) {
+  return consultarBandeja(where('participantes', 'array-contains', uid));
+}
+
+/**
+ * Todas las solicitudes (pestaña "Todas", solo RH y admin).
+ * 🔒 SEGURIDAD: firestore.rules solo permite esta consulta sin filtro a RH y admin.
+ * @returns {Promise<Solicitud[]>} Más recientes primero.
+ */
+export function listarTodas() {
+  return consultarBandeja();
 }
 
 // -------------------------------------------------------------

@@ -29,6 +29,12 @@ export const COLECCIONES = Object.freeze({
 });
 
 /**
+ * Máximo de solicitudes que trae cada consulta de la bandeja. Filtros, orden y
+ * búsqueda se aplican en el navegador sobre ese resultado (DECISIONES.md #22).
+ */
+export const LIMITE_BANDEJA = 200;
+
+/**
  * Numeración correlativa de las solicitudes ("SOL-0001").
  * El último número usado vive en contadores/{ID_CONTADOR}.ultimoNumero y se
  * incrementa dentro de una transacción al crear cada solicitud.
