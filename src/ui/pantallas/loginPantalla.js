@@ -20,6 +20,7 @@ import { iniciarSesion } from '../../services/authServicio.js';
  * @param {HTMLElement} contenedor
  */
 export function renderizarLogin(contenedor) {
+  contenedor.className = 'app app--publica';
   contenedor.innerHTML = `
     <section class="tarjeta tarjeta--login">
       <h1 class="titulo">Permisos</h1>

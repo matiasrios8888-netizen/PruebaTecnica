@@ -4,17 +4,18 @@
  * Archivo: src/main.js
  *
  * Responsabilidad:
- *   - Registrar las pantallas en el router.
+ *   - Registrar las pantallas en el router (con sus restricciones de rol).
  *   - Esperar a que Firebase informe si hay una sesión (puede estar recordada
  *     de una visita anterior) y recién ahí dibujar la primera pantalla.
  *   - Volver a resolver la ruta cada vez que alguien inicia o cierra sesión.
  *
- * Depende de: src/services/authServicio.js, src/ui/router.js,
- *   src/ui/pantallas/loginPantalla.js, src/ui/pantallas/inicioPantalla.js
+ * Depende de: src/services/authServicio.js, src/ui/router.js, src/ui/pantallas/*,
+ *   src/config/constantes.js
  * =============================================================
  */
 
 import { observarSesion, obtenerUsuarioActual } from './services/authServicio.js';
+import { ROLES } from './config/constantes.js';
 import {
   registrarRuta,
   iniciarRouter,
@@ -22,14 +23,18 @@ import {
   navegar,
   RUTA_LOGIN,
   RUTA_INICIO,
+  RUTA_NUEVA_SOLICITUD,
 } from './ui/router.js';
 import { renderizarLogin } from './ui/pantallas/loginPantalla.js';
 import { renderizarInicio } from './ui/pantallas/inicioPantalla.js';
+import { renderizarNuevaSolicitud } from './ui/pantallas/nuevaSolicitudPantalla.js';
 
 const contenedor = document.getElementById('app');
 
 registrarRuta(RUTA_LOGIN, renderizarLogin, { publica: true });
 registrarRuta(RUTA_INICIO, renderizarInicio);
+// ⚠️ IMPORTANTE: solo el iniciador crea solicitudes (también lo exigen el servicio y las reglas).
+registrarRuta(RUTA_NUEVA_SOLICITUD, renderizarNuevaSolicitud, { roles: [ROLES.INICIADOR] });
 
 iniciarRouter(contenedor, obtenerUsuarioActual);
 

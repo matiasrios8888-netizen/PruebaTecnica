@@ -288,3 +288,39 @@ Armamos la base de una app de permisos con arquitectura en capas (UI → servici
   await srv.listarInicio();
   ```
 - **Pendientes o dudas:** la prueba de integración dejó `SOL-0011` en la base; al cerrar la fase se recargan los datos de prueba.
+
+---
+
+## 2026-10-15 – Fase 2 – Paso: router con parámetros, marco y pantalla Nueva solicitud
+
+- **Qué hicimos:**
+  - El router ahora entiende rutas con parámetros (`#/solicitudes/:id`) y rutas restringidas por rol.
+  - Creamos un marco común para las pantallas privadas: encabezado, navegación según el rol y botón Salir.
+  - Construimos el formulario de **Nueva solicitud**. Muestra pistas en vivo (días máximos, si el tipo exige adjunto, cantidad de días), adjunta archivos y crea la solicitud con un aviso de confirmación.
+- **Archivos creados o modificados:**
+  - `src/ui/router.js`: patrones con parámetros, prioridad de rutas fijas sobre rutas con parámetros, opción `roles`, `rutaDetalle(id)` y `recargarPantalla()`.
+  - `src/ui/componentes/marco.js`: encabezado y navegación comunes. El enlace "Nueva solicitud" solo aparece para el iniciador.
+  - `src/ui/pantallas/nuevaSolicitudPantalla.js`: formulario de creación.
+  - `src/ui/pantallas/inicioPantalla.js`: usa el marco y ofrece "Nueva solicitud" al iniciador.
+  - `src/ui/pantallas/loginPantalla.js`: usa la clase de diseño de las pantallas públicas.
+  - `src/ui/utils/formato.js`: fechas, tamaños, nombres de estados, tipos y roles, y colores de las etiquetas de estado.
+  - `src/ui/utils/avisos.js`: avisos flotantes ("Solicitud SOL-0012 enviada…").
+  - `src/styles/main.css`: estilos del marco, formularios, botones, etiquetas, tablas e historial.
+  - `src/main.js`: registra la ruta de nueva solicitud, restringida al rol iniciador.
+- **Conceptos aprendidos:**
+  - **Ruta con parámetros:** el patrón `#/solicitudes/:id` coincide con `#/solicitudes/abc123` y entrega `{ id: 'abc123' }` a la pantalla.
+  - **Prioridad de rutas:** `#/solicitudes/nueva` también encaja en `#/solicitudes/:id`. Por eso las rutas fijas se prueban primero.
+  - **Componente reutilizable:** `dibujarMarco()` evita repetir el encabezado en cada pantalla.
+  - **Caché del navegador:** el navegador guarda los archivos JS. Si después de un cambio no se ve lo nuevo, hay que recargar con **Ctrl + F5**. Live Server lo hace solo al guardar.
+- **Comandos usados:**
+  - Prueba en el navegador (Playwright):
+    - un supervisor no ve "Nueva solicitud" y, si escribe la URL, vuelve al inicio;
+    - el formulario vacío muestra "Elegí un tipo de permiso.";
+    - Enfermedad sin certificado se rechaza;
+    - con el PDF adjunto se crea `SOL-0012`;
+    - no hubo errores en la consola.
+- **Cómo probarlo:**
+  1. Live Server → entrá como `iniciador@bprosys.test`.
+  2. **Nueva solicitud** → probá elegir Enfermedad sin adjuntar nada (error) y después con un PDF chico (se crea).
+  3. Entrá como `supervisor@bprosys.test`: no vas a ver "Nueva solicitud" en el menú.
+- **Pendientes o dudas:** al crear, la app vuelve al inicio porque la pantalla de detalle se construye en el próximo paso.
