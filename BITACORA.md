@@ -757,3 +757,48 @@ Construimos la bandeja de tareas: pestañas Pendientes, Nuevas y Enviadas (y Tod
     - con la misma contraseña → se completa y el admin sigue logueado.
 - **Cómo probarlo:** con `admin@bprosys.test`, ir a Usuarios → Nuevo usuario y dar de alta a alguien (por ejemplo, rol Iniciador, supervisor Carlos Pérez). Después cerrar sesión y entrar con el email y la contraseña inicial de la persona nueva.
 - **Pendientes o dudas:** por ahora, después del alta se vuelve al listado; en el paso siguiente va a abrir la ficha. Los usuarios creados en las pruebas se borran al cerrar la fase con el script temporal.
+
+## 2026-10-15 – Fase 4 – Paso: ficha del usuario (edición, baja, reactivación y contraseña)
+
+- **Qué hicimos:** cada fila del listado abre la ficha del usuario. Desde ahí el admin puede:
+  - **Editar** nombre, rol, área y supervisor. El email no se edita.
+  - **Dar de baja**, con confirmación. Si está bloqueada, la ficha muestra los motivos y deshabilita el botón.
+  - **Reactivar.** Un iniciador solo se reactiva si su supervisor está activo.
+  - **Enviar el mail** para que el usuario elija una contraseña nueva.
+  - **Ver sus trámites abiertos** (con enlace a cada uno) y, si es supervisor, sus colaboradores.
+
+  Al elegir otro rol, la ficha avisa al instante si el cambio está bloqueado. El servicio vuelve a decidirlo al guardar, con datos leídos en ese momento.
+- **Archivos creados o modificados:**
+  - `src/ui/pantallas/fichaUsuarioPantalla.js` (nuevo) y la ruta `#/usuarios/:id` en `src/main.js`. Después del alta se abre la ficha.
+  - `src/services/usuariosServicio.js`: `obtenerFichaUsuario`, `actualizarUsuario` (con el control del cambio de rol), `darDeBaja`, `reactivar` y `enviarCambioDeContrasena`.
+  - `src/data/solicitudesRepositorio.js`: `listarParticipacionesDe(uid)`. Trae todas las solicitudes donde el usuario participa, sin tope, para detectar trámites abiertos.
+  - `src/services/authServicio.js`: `actualizarUsuarioActual()`, para que el encabezado muestre el nombre nuevo cuando el admin se edita a sí mismo.
+  - `src/ui/utils/operaciones.js` (nuevo): `ejecutarConEstado()`, que se mudó desde el detalle de solicitudes para compartirlo con la ficha.
+  - `src/ui/pantallas/detalleSolicitudPantalla.js`: usa la utilidad compartida.
+  - Mensajes neutros en cuanto a género ("Se dio de baja a…", "(de baja)") en `gestionUsuarios.js`, el servicio y las pantallas.
+  - `src/styles/main.css`: lista de motivos de bloqueo.
+- **Conceptos aprendidos:**
+  - **Validar en el cliente y volver a validar en el servidor:** el aviso de la ficha usa los datos de cuando se abrió. Si en ese tiempo alguien creó un trámite, el servicio lo detecta al guardar porque lee todo de nuevo.
+  - **Clausura** (*closure*): `motivosCambioDeRol(rolNuevo)` es una función que el servicio devuelve "recordando" los usuarios y trámites que cargó. La pantalla la llama cada vez que cambia el rol, sin volver a consultar Firestore.
+  - **Pruebas de regresión:** cuando se mueve código compartido, se vuelve a probar la pantalla que lo usaba. Acá, agregar una nota en el detalle.
+- **Comandos usados:** prueba en el navegador con Martín:
+  - **Bloqueos:** Carlos está bloqueado por 7 trámites abiertos y 2 colaboradores; si se le elige otro rol, aparece el aviso y "Guardar" se deshabilita. Laura está bloqueada por 3 trámites y por ser la única RH. Martín no puede darse de baja ni cambiarse el rol. Ana está bloqueada por sus trámites. Sofía no tiene bloqueos.
+  - **Baja y reactivación:**
+    - Se reactiva a Sofía, se le asigna a Pedro (que está de baja) y se da de baja a Sofía.
+    - Reactivar a Pedro queda bloqueado: "el usuario de su supervisor (Sofía Díaz) está dado de baja".
+    - Con Carlos como supervisor, Pedro se reactiva. Siendo un usuario activo, el selector ya no ofrece supervisores de baja.
+  - **Lucía (RH):**
+    - Con dos RH activas, Laura deja de ser "la única RH".
+    - El mail de contraseña se envía.
+    - Al dar de baja a Lucía, el motivo de Laura vuelve.
+  - **Martín cambia su nombre** y el encabezado se actualiza al instante; después se restaura.
+  - **Sofía de baja** no puede iniciar sesión.
+  - **Regresión del detalle:** Ana agrega una nota (el historial pasa de 1 a 2 eventos). Sin scroll horizontal en 390 y 320 px. `npm run test:unitarios`: 82 en verde.
+- **Cómo probarlo:**
+  1. Con `admin@bprosys.test`, abrir Usuarios → Carlos Pérez: los motivos del bloqueo y el aviso al cambiar el rol.
+  2. Abrir Sofía Díaz → Dar de baja.
+  3. Entrar como `sofia.diaz@bprosys.test`: aparece "Tu usuario está dado de baja".
+  4. Volver como admin y reactivarla.
+- **Pendientes o dudas:**
+  - **Hallazgo de las pruebas, no de la app:** cuando el MCP de Playwright intercepta un `confirm()`, devuelve el control pero el script sigue ejecutándose. Eso mezcló dos pruebas. Desde entonces, en las pruebas automáticas se reemplaza `window.confirm`.
+  - Los cambios que hicieron las pruebas en los datos se revierten al cerrar la fase con `npm run seed` y el script temporal.

@@ -31,7 +31,7 @@ import { nombreRol } from '../utils/formato.js';
 export function htmlCamposUsuario({ valores = {}, supervisores, emailEditable = true }) {
   const nombresRol = Object.fromEntries(Object.values(ROLES).map((clave) => [clave, nombreRol(clave)]));
   const nombresSupervisor = Object.fromEntries(
-    supervisores.map((s) => [s.id, s.activo ? s.nombre : `${s.nombre} (dado de baja)`]),
+    supervisores.map((s) => [s.id, s.activo ? s.nombre : `${s.nombre} (de baja)`]),
   );
   const ayudaEmail = emailEditable
     ? 'Es el usuario para iniciar sesión.'

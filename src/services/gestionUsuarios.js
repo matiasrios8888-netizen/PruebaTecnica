@@ -145,7 +145,10 @@ export function validarDatosUsuario(datos, { id = null, activo = true, usuarios 
       throw new ErrorAplicacion('Elegí el supervisor que va a aprobar sus solicitudes.', 'sinSupervisor');
     }
     if (activo && !supervisor.activo) {
-      throw new ErrorAplicacion(`${supervisor.nombre} está dado de baja: elegí un supervisor activo.`, 'supervisorInactivo');
+      throw new ErrorAplicacion(
+        `No se puede asignar a ${supervisor.nombre}: su usuario está dado de baja. Elegí un supervisor activo.`,
+        'supervisorInactivo',
+      );
     }
   }
 
@@ -238,12 +241,12 @@ export function motivosDeBloqueo(usuario, { operacion, rolNuevo = null, usuarioA
  * @throws {ErrorAplicacion} Si ya está activo, o si es iniciador y su supervisor no está activo.
  */
 export function validarReactivacion(usuario, usuarios) {
-  if (usuario.activo) throw new ErrorAplicacion(`${usuario.nombre} ya está activo.`, 'yaActivo');
+  if (usuario.activo) throw new ErrorAplicacion(`El usuario de ${usuario.nombre} ya está activo.`, 'yaActivo');
   if (usuario.rol === ROLES.INICIADOR) {
     const supervisor = usuarios.find((u) => u.id === usuario.supervisorId);
     if (!esSupervisorActivo(supervisor)) {
       throw new ErrorAplicacion(
-        `No se puede reactivar: su supervisor (${supervisor?.nombre ?? 'sin asignar'}) no está activo. ` +
+        `No se puede reactivar: el usuario de su supervisor (${supervisor?.nombre ?? 'sin asignar'}) está dado de baja. ` +
           'Asignale un supervisor activo y volvé a intentar.',
         'supervisorInactivo',
       );

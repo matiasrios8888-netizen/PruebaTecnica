@@ -5,7 +5,7 @@
  *
  * Responsabilidad:
  *   Formulario para que el admin dé de alta un usuario: datos del perfil y
- *   contraseña inicial. Al guardar, vuelve al listado.
+ *   contraseña inicial. Al guardar, abre la ficha del usuario creado.
  *   La validación y el alta (cuenta de acceso + perfil) están en usuariosServicio.
  *
  * Depende de: src/services/usuariosServicio.js, src/config/constantes.js,
@@ -18,7 +18,7 @@ import { crearUsuario, prepararAlta } from '../../services/usuariosServicio.js';
 import { LIMITES_USUARIO } from '../../config/constantes.js';
 import { dibujarMarco } from '../componentes/marco.js';
 import { htmlCamposUsuario, conectarCampoSupervisor, leerCamposUsuario } from '../componentes/formularioUsuario.js';
-import { navegar, RUTA_USUARIOS } from '../router.js';
+import { navegar, rutaFichaUsuario, RUTA_USUARIOS } from '../router.js';
 import { escaparHtml } from '../utils/html.js';
 import { mostrarAviso } from '../utils/avisos.js';
 
@@ -84,9 +84,9 @@ export async function renderizarAltaUsuario(contenedor, usuario) {
     boton.disabled = true;
     boton.textContent = 'Dando de alta…';
     try {
-      const { nombre } = await crearUsuario(leerCamposUsuario(formulario), formulario.elements.contrasena.value);
-      mostrarAviso(`${nombre} quedó dado de alta.`);
-      navegar(RUTA_USUARIOS);
+      const { id, nombre } = await crearUsuario(leerCamposUsuario(formulario), formulario.elements.contrasena.value);
+      mostrarAviso(`Se dio de alta a ${nombre}.`);
+      navegar(rutaFichaUsuario(id));
     } catch (error) {
       if (!principal.isConnected) return;
       mensajeError.textContent = error.message;

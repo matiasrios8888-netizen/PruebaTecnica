@@ -109,6 +109,15 @@ export function obtenerUsuarioActual() {
 }
 
 /**
+ * Actualiza en memoria el perfil del usuario logueado cuando se edita a sí mismo
+ * (por ejemplo, el admin corrige su nombre), para que el encabezado lo muestre sin recargar.
+ * @param {Partial<Usuario>} cambios
+ */
+export function actualizarUsuarioActual(cambios) {
+  if (usuarioActual) usuarioActual = { ...usuarioActual, ...cambios };
+}
+
+/**
  * Usuario logueado, para el inicio de cada caso de uso de los servicios.
  * @param {string[]|null} [roles] - Si se indica, solo esos roles pueden continuar.
  * @returns {Usuario}

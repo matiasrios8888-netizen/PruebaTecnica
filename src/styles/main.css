@@ -611,3 +611,18 @@ input[type='file'] {
   gap: 8px;
   align-items: center;
 }
+
+/* ---------- Mantenimiento (usuarios y roles) ---------- */
+
+/* Motivos por los que una baja o un cambio de rol está bloqueado */
+.lista-motivos {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+
+.mensaje-alerta p {
+  margin: 0 0 4px;
+}
