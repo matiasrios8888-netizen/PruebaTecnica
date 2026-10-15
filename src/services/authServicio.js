@@ -9,18 +9,20 @@
  *   - Cargar el perfil del usuario (colección "usuarios") después de autenticarlo.
  *   - Impedir el ingreso de usuarios sin perfil o dados de baja (activo = false).
  *   - Traducir los errores de Firebase a mensajes claros en español.
- *   - Mantener el perfil del usuario logueado disponible para el resto de la app.
+ *   - Mantener el perfil del usuario logueado disponible para el resto de la app
+ *     y cargar el catálogo de nombres de roles (catalogoRoles.js).
  *   - Dar a los demás servicios el usuario requerido (con control de rol) y la
  *     traducción de errores que tiene en cuenta si la sesión sigue abierta.
  *
  * Depende de: src/data/authRepositorio.js, src/data/usuariosRepositorio.js,
- *   src/services/errores.js
+ *   src/services/errores.js, src/services/catalogoRoles.js
  * =============================================================
  */
 
 import { autenticar, desautenticar, escucharCambiosDeSesion } from '../data/authRepositorio.js';
 import { obtenerUsuarioPorId } from '../data/usuariosRepositorio.js';
 import { ErrorAplicacion, aErrorAplicacion } from './errores.js';
+import { cargarCatalogoRoles, limpiarCatalogoRoles } from './catalogoRoles.js';
 
 /** @typedef {import('../data/modelos.js').Usuario} Usuario */
 
@@ -54,6 +56,8 @@ async function cargarPerfilHabilitado(uid) {
   if (!perfil.activo) {
     throw new ErrorAplicacion('Tu usuario está dado de baja. Contactá al administrador.', 'usuarioInactivo');
   }
+  // Nombres de los roles elegidos por el admin, para mostrarlos en toda la app.
+  await cargarCatalogoRoles();
   return perfil;
 }
 
@@ -97,6 +101,7 @@ export async function iniciarSesion(email, password) {
  */
 export async function cerrarSesion() {
   usuarioActual = null;
+  limpiarCatalogoRoles();
   await desautenticar();
 }
 

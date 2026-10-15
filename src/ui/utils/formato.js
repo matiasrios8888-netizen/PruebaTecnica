@@ -6,11 +6,12 @@
  * Responsabilidad: mostrar fechas, tamaños y estados en formato legible
  *   para el usuario (es-AR).
  *
- * Depende de: src/config/constantes.js
+ * Depende de: src/config/constantes.js, src/services/catalogoRoles.js (nombres de los roles)
  * =============================================================
  */
 
-import { CONFIG_TIPOS_PERMISO, ESTADOS, NOMBRES_ESTADO, NOMBRES_ETAPA, NOMBRES_ROL } from '../../config/constantes.js';
+import { CONFIG_TIPOS_PERMISO, ESTADOS, NOMBRES_ESTADO, NOMBRES_ETAPA } from '../../config/constantes.js';
+import { nombreDeRol } from '../../services/catalogoRoles.js';
 
 const formatoFechaHora = new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' });
 
@@ -50,8 +51,8 @@ export const nombreTipo = (tipo) => CONFIG_TIPOS_PERMISO[tipo]?.nombre ?? tipo;
 export const nombreEstado = (estado) => NOMBRES_ESTADO[estado] ?? estado;
 /** Nombre para mostrar de una etapa. */
 export const nombreEtapa = (etapa) => NOMBRES_ETAPA[etapa] ?? etapa;
-/** Nombre para mostrar de un rol. */
-export const nombreRol = (rol) => NOMBRES_ROL[rol] ?? rol;
+/** Nombre para mostrar de un rol: el que eligió el admin en la gestión de roles (o el de fábrica). */
+export const nombreRol = (rol) => nombreDeRol(rol);
 
 /**
  * Clase CSS de la "etiqueta" de color de cada estado.

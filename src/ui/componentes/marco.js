@@ -15,7 +15,7 @@
 
 import { cerrarSesion } from '../../services/authServicio.js';
 import { ROLES } from '../../config/constantes.js';
-import { RUTA_INICIO, RUTA_NUEVA_SOLICITUD, RUTA_USUARIOS } from '../router.js';
+import { RUTA_INICIO, RUTA_NUEVA_SOLICITUD, RUTA_ROLES, RUTA_USUARIOS } from '../router.js';
 import { escaparHtml } from '../utils/html.js';
 import { nombreRol } from '../utils/formato.js';
 
@@ -31,7 +31,10 @@ export function dibujarMarco(contenedor, usuario) {
   // y firestore.rules igual lo controlan.)
   const enlacesDelRol = {
     [ROLES.INICIADOR]: [[RUTA_NUEVA_SOLICITUD, 'Nueva solicitud']],
-    [ROLES.ADMIN]: [[RUTA_USUARIOS, 'Usuarios']],
+    [ROLES.ADMIN]: [
+      [RUTA_USUARIOS, 'Usuarios'],
+      [RUTA_ROLES, 'Roles'],
+    ],
   };
   const enlacesExtra = (enlacesDelRol[usuario.rol] ?? [])
     .map(([ruta, texto]) => `<a href="${ruta}" class="nav__enlace">${texto}</a>`)

@@ -29,6 +29,7 @@ import {
   RUTA_USUARIOS,
   RUTA_NUEVO_USUARIO,
   RUTA_FICHA_USUARIO,
+  RUTA_ROLES,
 } from './ui/router.js';
 import { renderizarLogin } from './ui/pantallas/loginPantalla.js';
 import { renderizarBandeja } from './ui/pantallas/bandejaPantalla.js';
@@ -37,6 +38,7 @@ import { renderizarDetalleSolicitud } from './ui/pantallas/detalleSolicitudPanta
 import { renderizarUsuarios } from './ui/pantallas/usuariosPantalla.js';
 import { renderizarAltaUsuario } from './ui/pantallas/altaUsuarioPantalla.js';
 import { renderizarFichaUsuario } from './ui/pantallas/fichaUsuarioPantalla.js';
+import { renderizarRoles } from './ui/pantallas/rolesPantalla.js';
 
 const contenedor = document.getElementById('app');
 
@@ -52,6 +54,7 @@ registrarRuta(RUTA_DETALLE_SOLICITUD, renderizarDetalleSolicitud);
 registrarRuta(RUTA_USUARIOS, renderizarUsuarios, { roles: [ROLES.ADMIN] });
 registrarRuta(RUTA_NUEVO_USUARIO, renderizarAltaUsuario, { roles: [ROLES.ADMIN] });
 registrarRuta(RUTA_FICHA_USUARIO, renderizarFichaUsuario, { roles: [ROLES.ADMIN] });
+registrarRuta(RUTA_ROLES, renderizarRoles, { roles: [ROLES.ADMIN] });
 
 iniciarRouter(contenedor, obtenerUsuarioActual);
 

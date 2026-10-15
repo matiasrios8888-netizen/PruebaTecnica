@@ -802,3 +802,40 @@ Construimos la bandeja de tareas: pestañas Pendientes, Nuevas y Enviadas (y Tod
 - **Pendientes o dudas:**
   - **Hallazgo de las pruebas, no de la app:** cuando el MCP de Playwright intercepta un `confirm()`, devuelve el control pero el script sigue ejecutándose. Eso mezcló dos pruebas. Desde entonces, en las pruebas automáticas se reemplaza `window.confirm`.
   - Los cambios que hicieron las pruebas en los datos se revierten al cerrar la fase con `npm run seed` y el script temporal.
+
+## 2026-10-15 – Fase 4 – Paso: gestión de roles
+
+- **Qué hicimos:**
+  - Nueva pantalla "Roles" para el admin, con una tarjeta por cada uno de los 4 roles del sistema: descripción, permisos (solo lectura) y cantidad de usuarios activos y dados de baja.
+  - **Edición:** "Editar" cambia el nombre visible y la descripción. El nombre nuevo se ve en toda la app: menú, listados, filtros, historial y encabezado de cada usuario.
+  - **Rol perdido:** si falta el documento de uno de los 4 roles, la tarjeta lo marca como "Falta en el catálogo" y aparece el formulario **"Crear rol"**, que solo ofrece los roles faltantes y los crea con sus permisos de fábrica.
+  - **Sin roles faltantes:** la sección explica por qué no se pueden crear roles nuevos.
+  - **Si se pierde el documento de un rol, los usuarios con ese rol siguen trabajando.**
+- **Archivos creados o modificados:**
+  - `src/data/rolesRepositorio.js` (nuevo): `listarRoles`, `crearRol` y `actualizarRol`.
+  - `src/services/catalogoRoles.js` (nuevo): los nombres de los roles en memoria. Se cargan una vez al iniciar sesión y, si algo falla, se usa el nombre de fábrica.
+  - `src/services/rolesServicio.js` (nuevo): `obtenerGestionRoles`, `guardarRol` y `crearRolFaltante`, solo para el admin.
+  - `src/services/authServicio.js`: carga el catálogo al validar el perfil y lo limpia al cerrar sesión.
+  - `src/ui/utils/formato.js`: `nombreRol()` usa el catálogo.
+  - `src/ui/pantallas/rolesPantalla.js` (nuevo), el enlace "Roles" en el menú del admin y la ruta `#/roles` en `src/main.js`.
+  - `src/styles/main.css`: grilla de tarjetas de roles (2 columnas en pantallas anchas, 1 en celulares) y lista de permisos.
+  - `DECISIONES.md`: la 25 explica cómo se cargan los nombres.
+- **Conceptos aprendidos:**
+  - **Caché en memoria con valor por defecto:** el catálogo guarda los nombres en una variable del módulo. Si no hay dato, `nombreDeRol()` devuelve el nombre de fábrica, así la pantalla nunca muestra un rol vacío.
+  - **Evitar lecturas duplicadas:** al iniciar sesión, el login y el observador de sesión piden el catálogo casi a la vez. `cargaEnCurso` guarda la promesa y el segundo pedido reutiliza la misma lectura.
+  - **Diseño a prueba de datos perdidos:** el rol de cada usuario se valida contra la lista fija `ROLES` del código, no contra la colección. Por eso borrar un documento de `roles` no deja a nadie afuera.
+- **Comandos usados:**
+  - **Prueba en el navegador:**
+    - Las 4 tarjetas muestran sus permisos y conteos.
+    - Un nombre vacío da "Ingresá el nombre del rol.".
+    - RH pasa a "RRHH" y se ve en el listado de usuarios, en el filtro de rol y en el encabezado de Laura.
+    - Laura no ve "Roles", y `#/roles` la lleva a la bandeja.
+  - `node tmp-prueba-fase4.mjs borrar-rol rh` (script temporal):
+    - Laura entra igual y ve sus 3 solicitudes.
+    - El admin ve "Falta en el catálogo", el formulario "Crear rol" ofrece solo `rh` con sus permisos de fábrica, y al crearlo la tarjeta vuelve.
+  - Sin scroll horizontal en 390 y 320 px, y sin errores en la consola. Captura revisada; se agregó espacio entre la descripción y los permisos.
+- **Cómo probarlo:**
+  1. Con `admin@bprosys.test`, ir a "Roles" → Editar "Recursos Humanos" → cambiarle el nombre.
+  2. Entrar como `rh@bprosys.test` y ver el nombre nuevo en el encabezado.
+  3. Para ver el caso del rol perdido: borrar el documento `roles/rh` desde la consola de Firebase, recargar "Roles" y crearlo de nuevo.
+- **Pendientes o dudas:** queda la prueba integral, la documentación y el cierre de la fase.

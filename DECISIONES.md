@@ -211,6 +211,7 @@ Registro de las decisiones importantes del proyecto: qué decidimos, qué altern
 - **Decisión:**
   - El catálogo `roles` tiene solo los 4 roles que conoce el flujo.
   - El admin edita su nombre visible, que se usa en toda la app, y su descripción.
+  - Los nombres se cargan en memoria al iniciar sesión (`catalogoRoles.js`). Si falta un rol o falla la lectura, se usa el nombre de fábrica (`NOMBRES_ROL`).
   - Los permisos se muestran en solo lectura.
   - "Crear rol" existe solo para volver a crear uno de los 4 si falta su documento, por ejemplo si alguien lo borró desde la consola. Se crea con sus permisos de fábrica, y las reglas no aceptan otra clave ni otros permisos.
   - Se quitó el campo `activo` de los roles, porque un rol del sistema no se puede desactivar sin romper el flujo.
