@@ -28,6 +28,8 @@ import {
   elegirUsuarioRh,
   calcularTransicion,
   construirEventoNota,
+  accesoACampos,
+  validarGestionRh,
 } from '../../src/services/flujoSolicitud.js';
 import { ErrorAplicacion } from '../../src/services/errores.js';
 
@@ -238,13 +240,37 @@ describe('calcularTransicion', () => {
     assert.equal(cambios.asignadoA, 'ana');
   });
 
-  test('completar: queda finalizada y sin asignado', () => {
-    const enRh = solicitud({ estadoActual: 'enGestionRh', etapaActual: 'gestionRh', asignadoA: 'laura' });
-    const { cambios } = calcularTransicion({ ...base, accion: 'completar', solicitud: enRh, usuario: laura });
+  test('completar: queda finalizada, sin asignado y con los datos de RH', () => {
+    const enRh = solicitud({ estadoActual: 'enGestionRh', etapaActual: 'gestionRh', asignadoA: 'laura', cantidadDias: 5 });
+    const { cambios } = calcularTransicion({
+      ...base,
+      accion: 'completar',
+      solicitud: enRh,
+      usuario: laura,
+      datosGestionRh: { referenciaRh: ' LIQ-2026-0042 ', diasDescontados: '5' },
+    });
     assert.equal(cambios.estadoActual, 'completada');
     assert.equal(cambios.etapaActual, 'finalizada');
     assert.equal(cambios.asignadoA, null);
     assert.equal(cambios.vistaPorAsignado, true);
+    assert.equal(cambios.referenciaRh, 'LIQ-2026-0042');
+    assert.equal(cambios.diasDescontados, 5);
+  });
+
+  test('completar exige la referencia de liquidación', () => {
+    const enRh = solicitud({ estadoActual: 'enGestionRh', etapaActual: 'gestionRh', asignadoA: 'laura', cantidadDias: 5 });
+    lanzaError(
+      () => calcularTransicion({ ...base, accion: 'completar', solicitud: enRh, usuario: laura, datosGestionRh: { referenciaRh: ' ', diasDescontados: 5 } }),
+      'faltaReferenciaRh',
+    );
+  });
+
+  test('crear deja los campos de RH vacíos; aprobar no los toca', () => {
+    const creada = calcularTransicion({ ...base, accion: 'crear', solicitud: null, usuario: ana });
+    assert.equal(creada.cambios.referenciaRh, null);
+    assert.equal(creada.cambios.diasDescontados, null);
+    const aprobada = calcularTransicion({ ...base, accion: 'aprobar', solicitud: solicitud(), usuario: carlos });
+    assert.equal('referenciaRh' in aprobada.cambios, false);
   });
 
   test('la solicitante no puede aprobar su propia solicitud', () => {
@@ -261,5 +287,64 @@ describe('calcularTransicion', () => {
       () => calcularTransicion({ ...base, supervisor: { ...carlos, activo: false }, accion: 'crear', solicitud: null, usuario: ana }),
       'sinSupervisor',
     );
+  });
+});
+
+// -------------------------------------------------------------
+// Control de campos por rol (MATRIZ_CAMPOS)
+// -------------------------------------------------------------
+
+describe('accesoACampos', () => {
+  const campos = (acceso, ...nombres) => nombres.map((n) => acceso[n]);
+
+  test('en aprobación: todos ven los datos del permiso sin editarlos; los campos RH se ocultan', () => {
+    for (const usuario of [ana, carlos]) {
+      const acceso = accesoACampos(solicitud(), usuario);
+      assert.deepEqual(campos(acceso, 'tipoPermiso', 'motivo'), ['lectura', 'lectura']);
+      assert.deepEqual(campos(acceso, 'referenciaRh', 'diasDescontados'), ['oculto', 'oculto']);
+    }
+  });
+
+  test('devuelta: la solicitante edita los datos del permiso; el supervisor no', () => {
+    const devuelta = solicitud({ estadoActual: 'devuelta', etapaActual: 'solicitud', asignadoA: 'ana' });
+    assert.deepEqual(campos(accesoACampos(devuelta, ana), 'tipoPermiso', 'fechaInicio', 'fechaFin', 'motivo'), ['editable', 'editable', 'editable', 'editable']);
+    assert.equal(accesoACampos(devuelta, carlos).motivo, 'lectura');
+  });
+
+  test('en gestión RH: el RH asignado edita sus campos; admin los ve; la solicitante no', () => {
+    const enRh = solicitud({ estadoActual: 'enGestionRh', etapaActual: 'gestionRh', asignadoA: 'laura' });
+    assert.deepEqual(campos(accesoACampos(enRh, laura), 'referenciaRh', 'diasDescontados'), ['editable', 'editable']);
+    assert.equal(accesoACampos(enRh, laura).motivo, 'lectura');
+    assert.equal(accesoACampos(enRh, martin).referenciaRh, 'lectura');
+    assert.equal(accesoACampos(enRh, ana).referenciaRh, 'oculto');
+  });
+
+  test('un RH que no es el asignado no edita', () => {
+    const enRh = solicitud({ estadoActual: 'enGestionRh', etapaActual: 'gestionRh', asignadoA: 'laura' });
+    assert.equal(accesoACampos(enRh, bruno).referenciaRh, 'lectura');
+  });
+
+  test('completada: todos ven los campos de RH, nadie edita nada', () => {
+    const completada = solicitud({ estadoActual: 'completada', etapaActual: 'finalizada', asignadoA: null });
+    for (const usuario of [ana, carlos, laura, martin]) {
+      const acceso = accesoACampos(completada, usuario);
+      assert.deepEqual(campos(acceso, 'referenciaRh', 'diasDescontados', 'motivo'), ['lectura', 'lectura', 'lectura']);
+    }
+  });
+});
+
+describe('validarGestionRh', () => {
+  test('acepta datos válidos y los normaliza', () => {
+    assert.deepEqual(validarGestionRh({ referenciaRh: ' LIQ-1 ', diasDescontados: '0' }, 3), { referenciaRh: 'LIQ-1', diasDescontados: 0 });
+  });
+
+  test('rechaza días fuera de rango o no enteros', () => {
+    for (const dias of ['', '4', '-1', '1.5', 'dos']) {
+      lanzaError(() => validarGestionRh({ referenciaRh: 'LIQ-1', diasDescontados: dias }, 3), 'diasDescontadosInvalidos');
+    }
+  });
+
+  test('rechaza referencias de más de 40 caracteres', () => {
+    lanzaError(() => validarGestionRh({ referenciaRh: 'X'.repeat(41), diasDescontados: 1 }, 3), 'referenciaLarga');
   });
 });

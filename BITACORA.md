@@ -456,6 +456,123 @@ Construimos el flujo completo Solicitar → Aprobar → Gestionar RH de punta a 
 
 ---
 
+## 2026-10-15 – Fase 3 – Paso: consultas por pestaña e índices compuestos
+
+- **Qué hicimos:** creamos la rama `feature/bandeja` (con 0 bugs abiertos en `BUGS.md`, como pide la regla). Preparamos las consultas de las pestañas de la bandeja, ordenadas por última actualización y con tope de 200, y declaramos y publicamos los dos **índices compuestos** que necesitan.
+- **Archivos creados o modificados:**
+  - `src/data/solicitudesRepositorio.js`: `consultarBandeja()` (orden + tope); `listarAsignadasA` y `listarDondeParticipa` ordenadas; `listarTodas()` nueva (solo RH y admin).
+  - `firestore.indexes.json`: índices `(asignadoA, fechaActualizacion desc)` y `(participantes CONTAINS, fechaActualizacion desc)`.
+  - `src/config/constantes.js`: `LIMITE_BANDEJA = 200`.
+  - `src/config/firebase.js`: reexporta `limit`.
+  - `scripts/tests/reglas.test.mjs`: 2 tests nuevos (consultas ordenadas de cada pestaña; "Todas" permitida a RH y admin, prohibida al supervisor) → 46 tests.
+- **Conceptos aprendidos:**
+  - **Índice:** Firestore responde todas las consultas desde listas ya ordenadas. Los índices de un solo campo los crea solo.
+  - **Índice compuesto:** hace falta cuando una consulta filtra por un campo y ordena por otro. Sin él, Firestore rechaza la consulta con `FAILED_PRECONDITION` y un link para crearlo. Los declaramos en `firestore.indexes.json` para que queden versionados.
+  - **Construcción de índices:** después de publicarlos, Firestore tarda unos minutos en construirlos. Mientras tanto las consultas fallan, como comprobamos con un script.
+  - **Tope (`limit`):** evita traer miles de documentos de golpe. Si se alcanza, la pantalla lo avisa (paginación queda como mejora).
+- **Comandos usados:**
+  - `git switch -c feature/bandeja` y `git push -u origin feature/bandeja`: rama de la fase.
+  - `npm run test:reglas`: 46 tests en verde.
+  - `firebase deploy --only firestore:indexes`: publica los índices.
+  - Consulta con firebase-admin: confirma el `FAILED_PRECONDITION` mientras se construyen.
+- **Cómo probarlo:** en la consola de Firebase → Firestore → **Índices** → pestaña "Compuesto": aparecen los dos índices, primero "Compilando" y después "Habilitado".
+- **Pendientes o dudas:** la pantalla de la bandeja se construye en los próximos pasos.
+
+---
+
+## 2026-10-15 – Fase 3 – Paso: lógica pura de la bandeja
+
+- **Qué hicimos:** escribimos el módulo que decide qué pestañas ve cada usuario, qué va en cada una, y cómo se filtra, ordena y busca. Es puro (sin Firebase), así que lo cubrimos con 16 tests unitarios. Sumamos el caso de uso `cargarBandeja()` al servicio.
+- **Archivos creados o modificados:**
+  - `src/services/bandeja.js`:
+    - pestañas: `pestanasVisibles`, `armarPestanas`, `contarPestanas`;
+    - búsqueda y filtros: `normalizarTexto`, `coincideBusqueda`, `filtrarSolicitudes`;
+    - orden: `ordenarSolicitudes`, `procesarBandeja`.
+  - `src/services/solicitudesServicio.js`: `cargarBandeja()` hace 2 consultas en paralelo (3 para RH y admin) y avisa si se alcanzó el tope.
+  - `src/config/constantes.js`: `PESTANAS_BANDEJA`, `NOMBRES_PESTANA`, `ORDENES_BANDEJA`, `NOMBRES_ORDEN` y `ROLES_VEN_TODAS`.
+  - `scripts/tests/bandeja.test.mjs`: 16 tests (pestañas por rol, búsqueda sin tildes, filtros combinados, rango de fechas, orden).
+  - `scripts/package.json` y `README.md`: `test:flujo` pasa a llamarse `test:unitarios` e incluye los dos archivos de tests.
+- **Conceptos aprendidos:**
+  - **Normalización Unicode (NFD):** separa cada letra de su tilde ("ó" → "o" + "´") para poder borrar las tildes y comparar "Gómez" con "gomez".
+  - **Superposición de rangos:** dos períodos se pisan si uno empieza antes de que el otro termine y termina después de que el otro empiece (`fechaFin >= desde` y `fechaInicio <= hasta`).
+  - **Inmutabilidad:** `[...lista].sort()` ordena una copia, así la lista original (la que vino de Firestore) no cambia y se puede volver a filtrar.
+  - **Pestaña derivada:** "Nuevas" no necesita otra consulta: es un filtro sobre "Pendientes".
+- **Comandos usados:** `npm run test:unitarios` → 44 tests (28 del flujo + 16 de la bandeja).
+- **Cómo probarlo:** `cd scripts` y después `npm run test:unitarios`.
+- **Pendientes o dudas:** la pantalla de la bandeja va en el próximo paso. El inicio actual usa consultas que necesitan los índices compuestos, que tardan unos minutos en quedar habilitados después de publicarlos.
+
+---
+
+## 2026-10-15 – Fase 3 – Paso: pantalla Bandeja
+
+- **Qué hicimos:** la bandeja reemplaza el inicio. Tiene:
+  - pestañas Pendientes / Nuevas / Enviadas (y Todas para RH y admin), cada una con su contador; "Nuevas" se destaca si hay alguna;
+  - búsqueda, filtros por estado, etapa, tipo y rango de fechas, y orden;
+  - una tabla donde cada fila abre el detalle.
+
+  Cada pestaña es una ruta, así que el botón Atrás vuelve a la pestaña donde estabas. Filtrar es instantáneo porque no consulta Firestore, y los filtros se recuerdan al cambiar de pestaña o volver del detalle.
+- **Archivos creados o modificados:**
+  - `src/ui/pantallas/bandejaPantalla.js`: la pantalla nueva.
+  - `src/ui/componentes/tablaSolicitudes.js`: tabla reutilizable con la marca "Nueva" y filas clickeables.
+  - `src/ui/pantallas/inicioPantalla.js`: **eliminado** (lo reemplaza la bandeja).
+  - `src/services/solicitudesServicio.js`: se quitó `listarInicio()` (reemplazada por `cargarBandeja()`).
+  - `src/ui/router.js`: `RUTA_INICIO` pasa a ser `#/bandeja`; nuevas `RUTA_BANDEJA_PESTANA` y `rutaBandeja()`.
+  - `src/main.js`: registra `#/bandeja` y `#/bandeja/:pestana`.
+  - `src/ui/componentes/marco.js`: el enlace "Bandeja" queda marcado en todas sus pestañas.
+  - `src/styles/main.css`: estilos de pestañas, contadores y filtros.
+- **Conceptos aprendidos:**
+  - **Estado en la URL:** como la pestaña está en el hash, "Atrás" y los links compartidos funcionan sin código extra.
+  - **Redibujar solo lo necesario:** al filtrar se reemplaza solo `#resultados`; los datos ya leídos se reutilizan.
+  - **Defensa en profundidad:** si un supervisor escribe `#/bandeja/todas`, la pantalla lo devuelve a Pendientes; aunque no lo hiciera, las reglas rechazarían la consulta.
+  - **Índices en producción:** con los índices recién publicados, la bandeja falla unos minutos (`FAILED_PRECONDITION`) hasta que Firestore termina de construirlos (~6 minutos en este caso).
+- **Comandos usados:** prueba en el navegador con los 4 roles:
+  - supervisor: Pendientes 3, Nuevas 2, Enviadas 7, y `#/bandeja/todas` lo devuelve a Pendientes;
+  - RH: búsqueda "gomez vacaciones" (4 de 10), combinada con estado (1), filtro por tipo con orden por número, etapa finalizada, sin coincidencias, filtros conservados entre pestañas y "Limpiar filtros";
+  - iniciadora: 1 pendiente (`SOL-0004` devuelta);
+  - admin: Todas 10;
+  - "Atrás" desde un detalle vuelve a `#/bandeja/todas`;
+  - sin errores en la consola.
+- **Cómo probarlo:**
+  1. Live Server (Ctrl + F5 si no ves los cambios) → entrá como `rh@bprosys.test`.
+  2. Probá las pestañas, buscá "gomez vacaciones" y combiná filtros.
+  3. Abrí una solicitud y volvé con el botón Atrás del navegador: seguís en la misma pestaña y con los mismos filtros.
+- **Pendientes o dudas:** en las capturas el texto del orden quedaba cortado ("Actualizadas recien…"). Las etiquetas se acortaron ("Más recientes", etc.) y ese cambio entra con el commit del próximo paso, porque está en `constantes.js`, que ya tiene cambios de ese paso.
+
+---
+
+## 2026-10-15 – Fase 3 – Paso: matriz de control de campos por rol y gestión RH
+
+- **Qué hicimos:** el control de campos por rol pasó de un `if` suelto a una **matriz** (`MATRIZ_CAMPOS`) que define, para cada campo, quién lo edita, en qué estado, con qué acción se guarda y quién lo ve. Sumamos dos campos de gestión RH:
+  - `referenciaRh`: referencia de liquidación, obligatoria para completar;
+  - `diasDescontados`: entre 0 y los días del permiso.
+
+  Los carga solo el RH asignado al completar. Las reglas exigen lo mismo, y el detalle se dibuja a partir de la matriz.
+- **Archivos creados o modificados:**
+  - `src/config/constantes.js`: `CAMPOS`, `ACCESO_CAMPO` y `MATRIZ_CAMPOS`. También van acá las etiquetas de orden más cortas que quedaron pendientes del paso anterior.
+  - `src/services/flujoSolicitud.js`: `accesoACampos()` (editable / lectura / oculto) y `validarGestionRh()`. `calcularTransicion()` deja los campos RH en `null` al crear y los exige al completar.
+  - `src/services/solicitudesServicio.js`: `obtenerDetalle()` devuelve `campos` (la matriz aplicada al usuario); `ejecutarAccion()` recibe `datosGestionRh`.
+  - `src/ui/pantallas/detalleSolicitudPantalla.js`: los campos se habilitan según la matriz; nueva sección "Gestión RH" (oculta, de lectura o editable).
+  - `firestore.rules`: campos nuevos en `null` al crear; solo el RH asignado los carga al completar; referencia de 1 a 40 caracteres; días entre 0 y `cantidadDias`.
+  - `scripts/tests/reglas.test.mjs`: 6 tests nuevos de gestión RH (52 en total).
+  - `scripts/tests/flujoSolicitud.test.mjs`: 10 tests nuevos de la matriz y la validación RH (54 unitarios).
+  - `scripts/seed.mjs` y `scripts/datosPrueba.mjs`: las solicitudes completadas traen referencia y días descontados.
+  - `src/data/modelos.js` y `docs/MODELO_DATOS.md`: campos nuevos y tabla de la matriz.
+- **Conceptos aprendidos:**
+  - **Configuración en vez de `if`:** la matriz es un dato. Sumar un campo o cambiar quién lo edita se hace en `constantes.js`, sin tocar la pantalla.
+  - **Editar vs. ver:** las reglas de Firestore protegen la **edición** campo por campo, pero no pueden ocultar campos de un documento que el usuario puede leer. La visibilidad es de la interfaz, y por eso esos campos no guardan datos sensibles.
+  - **Validar en tres lugares:** pantalla (número entre 0 y N), servicio (`validarGestionRh`) y reglas (`gestionRhValida`).
+- **Comandos usados:**
+  - `npm test`: 54 unitarios + 52 de reglas, todos en verde.
+  - `firebase deploy --only firestore:rules` y `npm run seed`: reglas publicadas y datos recargados.
+  - Prueba en el navegador:
+    - Laura intenta completar sin referencia (error) y con 9 días en un permiso de 3 (error); completa con 3 y los campos quedan de solo lectura;
+    - Ana ve la gestión RH solo una vez completada, y edita los datos solo en su devuelta;
+    - Carlos no ve la gestión RH mientras está en curso;
+    - Martín (admin) la ve en lectura.
+- **Cómo probarlo:**
+  1. Como `rh@bprosys.test`, abrí `SOL-0005`: la sección "Gestión RH" está habilitada. Probá completar sin referencia.
+  2. Como `iniciador@bprosys.test`, abrí la misma solicitud antes y después de completarla.
+- **Pendientes o dudas:** durante esta prueba se detectaron **dos bugs** en código que ya está en `main`: el seed cierra las sesiones abiertas (BUG-006) y la columna de acciones del detalle se desborda en pantallas medianas (BUG-007). Se corrigen cada uno en su rama `fix/...` desde `main`, como pide la regla.
 ## 2026-10-15 – Corrección – BUG-006: recargar los datos de prueba cerraba las sesiones
 
 - **Qué hicimos:** primer bug corregido con el flujo **Detectar → Ramificar → Corregir → Testear → Integrar**. Lo detectamos durante la Fase 3: un `400` de `accounts:lookup` al recargar la página. Creamos la rama `fix/BUG-006-seed-cierra-sesiones` desde `main`, corregimos el seed para que no cambie la contraseña de los usuarios que ya existen, lo probamos y lo integramos a `main`.
@@ -495,3 +612,39 @@ Construimos el flujo completo Solicitar → Aprobar → Gestionar RH de punta a 
   - `git merge --no-ff fix/BUG-007-desborde-columna-acciones` (en `main`).
 - **Cómo probarlo:** abrí el detalle de una solicitud con acciones y achicá la ventana del navegador de a poco: la columna derecha nunca sobresale. En modo celular (F12 → ícono de dispositivo móvil) la tabla del inicio se desplaza dentro de su recuadro, y la página no se corre de costado.
 - **Pendientes o dudas:** ninguno. Siguiente: traer `main` (con BUG-006 y BUG-007) a `feature/bandeja` y terminar la Fase 3.
+
+---
+
+## 2026-10-15 – Fase 3 – Paso: integración de correcciones, prueba final y cierre
+
+- **Qué hicimos:**
+  - Trajimos a `feature/bandeja` las correcciones BUG-006 y BUG-007 que ya estaban en `main`, y resolvimos 3 conflictos de merge quedándonos con las dos versiones.
+  - Hicimos una prueba completa de la fase con los 4 roles, documentamos las decisiones 22 y 23 y cerramos la fase con el merge a `main`.
+- **Archivos creados o modificados:**
+  - `BITACORA.md`, `README.md` y `scripts/package.json`: conflictos resueltos (entradas de las dos ramas, filas del README de las dos ramas, los comandos `seed:restablecer-claves` y `test:unitarios`).
+  - `README.md`: Fase 3 completa, qué puede hacer cada rol (bandeja, matriz, gestión RH) y estructura actualizada.
+  - `DECISIONES.md`: 22 (consulta por pestaña + filtrado en el navegador + índices) y 23 (matriz de control de campos por rol, con su límite: Firestore no oculta campos sueltos).
+- **Conceptos aprendidos:**
+  - **Conflicto de merge:** cuando dos ramas cambian las mismas líneas, git marca el archivo con `<<<<<<<`, `=======` y `>>>>>>>`. Se edita para quedarse con lo correcto (acá, las dos cosas), se borran las marcas y se commitea. Antes de commitear se verifica que todo siga funcionando (106 tests).
+  - **Actualizar una rama con `main`:** `git merge main` dentro de la rama de trabajo trae las correcciones antes de integrarla. Así el merge final a `main` no tiene sorpresas.
+  - **Sincronización en tests de interfaz:** `waitForURL` termina cuando cambia la URL, pero el navegador redibuja recién en el evento `hashchange`. Hay que esperar una condición de la pantalla nueva (por ejemplo, que la pestaña activa sea la correcta), no la URL. Un test que falla "a veces" casi siempre es esto, no un bug de la app.
+- **Comandos usados:**
+  - `git merge main` (en `feature/bandeja`), resolución de conflictos y `git commit --no-edit`.
+  - `npm test` (54 + 52) y `npm run seed`.
+  - Prueba en el navegador del flujo completo:
+    1. Ana crea `SOL-0011` (enfermedad con certificado) → aparece en sus Enviadas.
+    2. Carlos la ve en Nuevas (3) y la aprueba → su bandeja baja a Pendientes 3 / Nuevas 2.
+    3. Laura la completa con referencia `LIQ-2026-1101` y 3 días.
+    4. Ana la ve completada, con la gestión RH en solo lectura y 4 eventos en el historial.
+    5. Martín filtra Todas por Completada → `SOL-0011`, `SOL-0009`, `SOL-0008` (4 de 4 intentos).
+
+    La bandeja no tiene scroll horizontal en 1440, 1024, 800, 390 ni 320 px, y la consola no registró errores.
+  - `git merge --no-ff feature/bandeja` (en `main`).
+- **Cómo probarlo:** Live Server (Ctrl + F5) y repetir el recorrido de arriba con los usuarios de prueba.
+- **Pendientes o dudas:** `BUGS.md` tiene 0 abiertos. La paginación de la bandeja (más de 200 solicitudes por lista) queda como mejora.
+
+---
+
+## Resumen de la Fase 3
+
+Construimos la bandeja de tareas: pestañas Pendientes, Nuevas y Enviadas (y Todas para RH y admin) con contadores, búsqueda sin tildes ni mayúsculas, filtros por estado, etapa, tipo y rango de fechas, y orden. Cada pestaña es una consulta a Firestore con su índice compuesto, y filtrar y buscar ocurre en el navegador con lógica pura y testeada. El control de campos por rol pasó a ser una matriz de configuración que decide, campo por campo, quién edita y quién ve según el rol y el estado. La sumamos con los datos de gestión RH, que solo carga el RH asignado al completar, y las reglas de Firestore exigen lo mismo. Durante la fase detectamos dos bugs en código ya publicado (el seed cerraba sesiones y desbordes de diseño). Los corregimos cada uno en su propia rama desde `main`, con tests de regresión, y los integramos a la fase resolviendo los conflictos de merge. Terminamos con 106 tests automáticos en verde y 0 bugs abiertos.

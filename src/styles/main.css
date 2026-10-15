@@ -440,6 +440,65 @@ a {
   white-space: pre-wrap;
 }
 
+/* ---------- Bandeja: pestañas y filtros ---------- */
+
+.pestanas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 20px;
+  border-bottom: 1px solid var(--color-borde-suave);
+}
+
+.pestana {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  color: var(--color-texto-suave);
+  text-decoration: none;
+  font-weight: 600;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+}
+
+.pestana[aria-current='page'] {
+  color: var(--color-primario);
+  border-bottom-color: var(--color-primario);
+}
+
+.contador {
+  min-width: 24px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--color-borde-suave);
+  color: var(--color-texto);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.contador--destacado {
+  background: var(--color-primario);
+  color: #fff;
+}
+
+.filtros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+
+.filtros__busqueda {
+  grid-column: 1 / -1;
+}
+
+.filtros__acciones {
+  display: flex;
+  align-items: end;
+}
+
 /* ---------- Detalle ---------- */
 
 .detalle-grilla {

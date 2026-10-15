@@ -24,6 +24,7 @@
  */
 
 import {
+  ACCESO_CAMPO,
   ACCIONES,
   ACCIONES_HISTORIAL,
   CONFIG_TIPOS_PERMISO,
@@ -31,6 +32,7 @@ import {
   ESTADOS,
   ESTADOS_FINALES,
   LIMITES_ADJUNTO,
+  MATRIZ_CAMPOS,
   NOMBRES_ROL,
   NUMERACION_SOLICITUD,
   ROLES,
@@ -46,6 +48,8 @@ import { ErrorAplicacion } from './errores.js';
 export const LARGO_MAXIMO_MOTIVO = 1000;
 /** Largo máximo de un comentario o nota (igual que en firestore.rules). */
 export const LARGO_MAXIMO_COMENTARIO = 2000;
+/** Largo máximo de la referencia de liquidación de RH (igual que en firestore.rules). */
+export const LARGO_MAXIMO_REFERENCIA_RH = 40;
 
 const MS_POR_DIA = 24 * 60 * 60 * 1000;
 const PATRON_FECHA = /^\d{4}-\d{2}-\d{2}$/;
@@ -172,6 +176,31 @@ export function validarArchivoAdjunto({ nombre, tipo, tamano }) {
 }
 
 /**
+ * Valida los datos que carga RH al completar la gestión.
+ * ⚠️ IMPORTANTE: la referencia es obligatoria y los días descontados no pueden
+ * superar los días del permiso. firestore.rules exige lo mismo.
+ * @param {{ referenciaRh: string, diasDescontados: number|string }} datos - Valores del formulario.
+ * @param {number} cantidadDias - Días del permiso.
+ * @returns {{ referenciaRh: string, diasDescontados: number }} Datos normalizados.
+ * @throws {ErrorAplicacion} Si falta la referencia o los días no son válidos.
+ */
+export function validarGestionRh(datos, cantidadDias) {
+  const referenciaRh = String(datos?.referenciaRh ?? '').trim();
+  if (!referenciaRh) {
+    throw new ErrorAplicacion('Ingresá la referencia de liquidación para completar la gestión.', 'faltaReferenciaRh');
+  }
+  if (referenciaRh.length > LARGO_MAXIMO_REFERENCIA_RH) {
+    throw new ErrorAplicacion(`La referencia puede tener hasta ${LARGO_MAXIMO_REFERENCIA_RH} caracteres.`, 'referenciaLarga');
+  }
+  const texto = String(datos?.diasDescontados ?? '').trim();
+  const diasDescontados = Number(texto);
+  if (texto === '' || !Number.isInteger(diasDescontados) || diasDescontados < 0 || diasDescontados > cantidadDias) {
+    throw new ErrorAplicacion(`Los días descontados tienen que ser un número entero entre 0 y ${cantidadDias}.`, 'diasDescontadosInvalidos');
+  }
+  return { referenciaRh, diasDescontados };
+}
+
+/**
  * Normaliza y valida el texto de una nota o comentario.
  * @param {string} texto
  * @param {{ obligatorio: boolean }} opciones
@@ -283,6 +312,34 @@ export function puedeCorregirDatos(solicitud, usuario) {
   return puedeEjecutar(ACCIONES.REENVIAR, solicitud, usuario);
 }
 
+/**
+ * ⚠️ IMPORTANTE (control de campos por rol): aplica MATRIZ_CAMPOS a un caso concreto.
+ * Un campo es:
+ *   - EDITABLE si el usuario puede ejecutar ahora la acción que lo guarda (mismo
+ *     estado, rol y ejecutor que pide la matriz);
+ *   - LECTURA si su rol y el estado están entre los que pueden verlo, o si el
+ *     estado está en "lecturaGeneralEn";
+ *   - OCULTO en cualquier otro caso.
+ * @param {Solicitud} solicitud
+ * @param {Usuario} usuario
+ * @returns {Record<string, string>} Acceso por campo (valores de ACCESO_CAMPO).
+ */
+export function accesoACampos(solicitud, usuario) {
+  const acceso = {};
+  for (const [campo, config] of Object.entries(MATRIZ_CAMPOS)) {
+    const { edicion, lectura, lecturaGeneralEn = [] } = config;
+    const editable = solicitud.estadoActual === edicion.estado && puedeEjecutar(edicion.accion, solicitud, usuario);
+    const rolPuedeVer = !lectura.roles || lectura.roles.includes(usuario.rol);
+    const estadoPermiteVer = !lectura.estados || lectura.estados.includes(solicitud.estadoActual);
+    const visible = (rolPuedeVer && estadoPermiteVer) || lecturaGeneralEn.includes(solicitud.estadoActual);
+
+    if (editable) acceso[campo] = ACCESO_CAMPO.EDITABLE;
+    else if (visible) acceso[campo] = ACCESO_CAMPO.LECTURA;
+    else acceso[campo] = ACCESO_CAMPO.OCULTO;
+  }
+  return acceso;
+}
+
 // -------------------------------------------------------------
 // Asignación
 // -------------------------------------------------------------
@@ -374,15 +431,34 @@ function construirEvento(usuario, accionHistorial, cambio, comentario) {
  * @param {{id: string, nombre: string}} parametros.solicitante - Dueño de la solicitud.
  * @param {Usuario} [parametros.supervisor] - Supervisor del solicitante (al crear y reenviar).
  * @param {Usuario[]} [parametros.usuariosRh] - Usuarios RH (al aprobar).
+ * @param {{ referenciaRh: string, diasDescontados: number|string }} [parametros.datosGestionRh]
+ *   Obligatorio al completar: lo que carga RH (ver MATRIZ_CAMPOS).
  * @returns {{ cambios: Partial<Solicitud>, evento: Omit<EventoHistorial, 'id'|'fecha'> }}
  * @throws {ErrorAplicacion} Si la acción no está permitida o faltan datos.
  */
-export function calcularTransicion({ accion, solicitud, usuario, comentario = '', numero, solicitante, supervisor, usuariosRh }) {
+export function calcularTransicion({
+  accion,
+  solicitud,
+  usuario,
+  comentario = '',
+  numero,
+  solicitante,
+  supervisor,
+  usuariosRh,
+  datosGestionRh,
+}) {
   const rechazo = motivoDeRechazo(accion, solicitud, usuario);
   if (rechazo) throw new ErrorAplicacion(rechazo, 'accionNoPermitida');
 
   const transicion = TRANSICIONES[accion];
   const comentarioLimpio = validarComentario(comentario, { obligatorio: transicion.requiereComentario });
+  // ⚠️ IMPORTANTE: los campos de gestión RH nacen vacíos y solo se cargan al completar.
+  const gestionRh =
+    accion === ACCIONES.CREAR
+      ? { referenciaRh: null, diasDescontados: null }
+      : accion === ACCIONES.COMPLETAR
+        ? validarGestionRh(datosGestionRh, solicitud.cantidadDias)
+        : {};
   const asignado = resolverAsignado(transicion.estadoNuevo, { solicitante, supervisor, usuariosRh, numero });
   const esFinal = ESTADOS_FINALES.includes(transicion.estadoNuevo);
 
@@ -399,6 +475,7 @@ export function calcularTransicion({ accion, solicitud, usuario, comentario = ''
     // El nuevo asignado todavía no la vio ("Nuevas"); si terminó, no hay nada nuevo.
     vistaPorAsignado: esFinal,
     participantes: [...participantes],
+    ...gestionRh,
   };
 
   const evento = construirEvento(

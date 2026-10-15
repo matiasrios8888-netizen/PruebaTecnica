@@ -5,7 +5,7 @@
  *
  * Responsabilidad:
  *   Decidir qué pantalla se muestra según la parte de la URL después del
- *   "#" (hash): #/login, #/inicio, #/solicitudes/abc123, etc. Cambiar el hash
+ *   "#" (hash): #/login, #/bandeja/nuevas, #/solicitudes/abc123, etc. Cambiar el hash
  *   no recarga la página, así que la app funciona como SPA (Single Page
  *   Application) sin configurar el servidor.
  *   También protege las pantallas: sin sesión redirige al login, y las rutas
@@ -27,9 +27,18 @@
  */
 
 export const RUTA_LOGIN = '#/login';
-export const RUTA_INICIO = '#/inicio';
+/** Pantalla principal después del login: la bandeja (pestaña Pendientes). */
+export const RUTA_INICIO = '#/bandeja';
+export const RUTA_BANDEJA_PESTANA = '#/bandeja/:pestana';
 export const RUTA_NUEVA_SOLICITUD = '#/solicitudes/nueva';
 export const RUTA_DETALLE_SOLICITUD = '#/solicitudes/:id';
+
+/**
+ * Arma el hash de una pestaña de la bandeja.
+ * @param {string} pestana - Una de PESTANAS_BANDEJA.
+ * @returns {string} Ej: "#/bandeja/nuevas".
+ */
+export const rutaBandeja = (pestana) => `#/bandeja/${encodeURIComponent(pestana)}`;
 
 /**
  * Arma el hash del detalle de una solicitud.
@@ -51,7 +60,7 @@ let pantallaActual = { hash: null, usuarioId: null };
  * Registra una pantalla para un patrón de ruta.
  * Las rutas fijas tienen prioridad sobre las que tienen parámetros
  * ("#/solicitudes/nueva" gana sobre "#/solicitudes/:id").
- * @param {string} patron - Ej: "#/inicio" o "#/solicitudes/:id".
+ * @param {string} patron - Ej: "#/bandeja" o "#/solicitudes/:id".
  * @param {Ruta['renderizar']} renderizar
  * @param {{ publica?: boolean, roles?: string[] }} [opciones]
  */

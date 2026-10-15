@@ -29,6 +29,46 @@ export const COLECCIONES = Object.freeze({
 });
 
 /**
+ * Máximo de solicitudes que trae cada consulta de la bandeja. Filtros, orden y
+ * búsqueda se aplican en el navegador sobre ese resultado (DECISIONES.md #22).
+ */
+export const LIMITE_BANDEJA = 200;
+
+/** Pestañas de la bandeja. */
+export const PESTANAS_BANDEJA = Object.freeze({
+  PENDIENTES: 'pendientes', // asignadas a mí
+  NUEVAS: 'nuevas', // asignadas a mí y todavía no abiertas
+  ENVIADAS: 'enviadas', // intervine y ya no están en mis manos
+  TODAS: 'todas', // todas las de la empresa (solo ROLES_VEN_TODAS)
+});
+
+export const NOMBRES_PESTANA = Object.freeze({
+  [PESTANAS_BANDEJA.PENDIENTES]: 'Pendientes',
+  [PESTANAS_BANDEJA.NUEVAS]: 'Nuevas',
+  [PESTANAS_BANDEJA.ENVIADAS]: 'Enviadas',
+  [PESTANAS_BANDEJA.TODAS]: 'Todas',
+});
+
+/** Criterios de orden de la bandeja. */
+export const ORDENES_BANDEJA = Object.freeze({
+  RECIENTES: 'recientes',
+  ANTIGUAS: 'antiguas',
+  INICIO_PROXIMO: 'inicioProximo',
+  INICIO_LEJANO: 'inicioLejano',
+  NUMERO_DESC: 'numeroDesc',
+  NUMERO_ASC: 'numeroAsc',
+});
+
+export const NOMBRES_ORDEN = Object.freeze({
+  [ORDENES_BANDEJA.RECIENTES]: 'Más recientes',
+  [ORDENES_BANDEJA.ANTIGUAS]: 'Más antiguas',
+  [ORDENES_BANDEJA.INICIO_PROXIMO]: 'Inicio más próximo',
+  [ORDENES_BANDEJA.INICIO_LEJANO]: 'Inicio más lejano',
+  [ORDENES_BANDEJA.NUMERO_DESC]: 'Número descendente',
+  [ORDENES_BANDEJA.NUMERO_ASC]: 'Número ascendente',
+});
+
+/**
  * Numeración correlativa de las solicitudes ("SOL-0001").
  * El último número usado vive en contadores/{ID_CONTADOR}.ultimoNumero y se
  * incrementa dentro de una transacción al crear cada solicitud.
@@ -51,6 +91,12 @@ export const ROLES = Object.freeze({
   RH: 'rh',
   ADMIN: 'admin',
 });
+
+/**
+ * 🔒 SEGURIDAD: roles que pueden ver TODAS las solicitudes (pestaña "Todas",
+ * reportes). firestore.rules aplica la misma lista en la regla de lectura.
+ */
+export const ROLES_VEN_TODAS = Object.freeze([ROLES.RH, ROLES.ADMIN]);
 
 /** Texto para mostrar de cada rol. */
 export const NOMBRES_ROL = Object.freeze({
@@ -301,6 +347,80 @@ export const TRANSICIONES = Object.freeze({
     ejecutor: EJECUTORES.SOLICITANTE,
     accionHistorial: ACCIONES_HISTORIAL.CANCELADA,
     requiereComentario: false,
+  },
+});
+
+// -------------------------------------------------------------
+// Control de campos por rol (matriz)
+// -------------------------------------------------------------
+
+/** Campos de la solicitud cuya edición y visibilidad dependen del rol y del estado. */
+export const CAMPOS = Object.freeze({
+  TIPO_PERMISO: 'tipoPermiso',
+  FECHA_INICIO: 'fechaInicio',
+  FECHA_FIN: 'fechaFin',
+  MOTIVO: 'motivo',
+  REFERENCIA_RH: 'referenciaRh',
+  DIAS_DESCONTADOS: 'diasDescontados',
+});
+
+/** Cómo ve un usuario un campo. */
+export const ACCESO_CAMPO = Object.freeze({
+  EDITABLE: 'editable',
+  LECTURA: 'lectura',
+  OCULTO: 'oculto',
+});
+
+/**
+ * ⚠️ IMPORTANTE: matriz de control de campos por rol y estado.
+ * Para cada campo:
+ *   - grupo: sección del detalle donde se muestra ("permiso" o "gestionRh").
+ *   - edicion: quién lo edita → en qué estado, con qué rol, si debe ser el
+ *     asignado o el solicitante, y con qué acción se guarda.
+ *   - lectura: quién lo ve (null = sin restricción): roles y estados.
+ *   - lecturaGeneralEn: estados en los que lo ve cualquiera que pueda abrir la solicitud.
+ * La usa flujoSolicitud.accesoACampos(); firestore.rules exige lo mismo para la edición.
+ * Nota: Firestore no oculta campos sueltos de un documento. La visibilidad se
+ * controla en la pantalla; la EDICIÓN la controlan además las reglas.
+ */
+export const MATRIZ_CAMPOS = Object.freeze({
+  [CAMPOS.TIPO_PERMISO]: {
+    etiqueta: 'Tipo de permiso',
+    grupo: 'permiso',
+    edicion: { estado: ESTADOS.DEVUELTA, rol: ROLES.INICIADOR, ejecutor: EJECUTORES.SOLICITANTE, accion: ACCIONES.REENVIAR },
+    lectura: { roles: null, estados: null },
+  },
+  [CAMPOS.FECHA_INICIO]: {
+    etiqueta: 'Desde',
+    grupo: 'permiso',
+    edicion: { estado: ESTADOS.DEVUELTA, rol: ROLES.INICIADOR, ejecutor: EJECUTORES.SOLICITANTE, accion: ACCIONES.REENVIAR },
+    lectura: { roles: null, estados: null },
+  },
+  [CAMPOS.FECHA_FIN]: {
+    etiqueta: 'Hasta (inclusive)',
+    grupo: 'permiso',
+    edicion: { estado: ESTADOS.DEVUELTA, rol: ROLES.INICIADOR, ejecutor: EJECUTORES.SOLICITANTE, accion: ACCIONES.REENVIAR },
+    lectura: { roles: null, estados: null },
+  },
+  [CAMPOS.MOTIVO]: {
+    etiqueta: 'Motivo',
+    grupo: 'permiso',
+    edicion: { estado: ESTADOS.DEVUELTA, rol: ROLES.INICIADOR, ejecutor: EJECUTORES.SOLICITANTE, accion: ACCIONES.REENVIAR },
+    lectura: { roles: null, estados: null },
+  },
+  [CAMPOS.REFERENCIA_RH]: {
+    etiqueta: 'Referencia de liquidación',
+    grupo: 'gestionRh',
+    edicion: { estado: ESTADOS.EN_GESTION_RH, rol: ROLES.RH, ejecutor: EJECUTORES.ASIGNADO, accion: ACCIONES.COMPLETAR },
+    lectura: { roles: [ROLES.RH, ROLES.ADMIN], estados: [ESTADOS.EN_GESTION_RH, ESTADOS.COMPLETADA] },
+    lecturaGeneralEn: [ESTADOS.COMPLETADA],
+  },
+  [CAMPOS.DIAS_DESCONTADOS]: {
+    etiqueta: 'Días descontados del saldo',
+    grupo: 'gestionRh',
+    edicion: { estado: ESTADOS.EN_GESTION_RH, rol: ROLES.RH, ejecutor: EJECUTORES.ASIGNADO, accion: ACCIONES.COMPLETAR },
+    lectura: { roles: [ROLES.RH, ROLES.ADMIN], estados: [ESTADOS.EN_GESTION_RH, ESTADOS.COMPLETADA] },
+    lecturaGeneralEn: [ESTADOS.COMPLETADA],
   },
 });
 

@@ -18,7 +18,8 @@
  *   - adjuntosIniciales: archivos que el solicitante adjunta al crearla.
  *   - pasos: lo que pasó después, en orden. Cada paso ocurre "horas" después
  *     del anterior y lo hace el usuario "por". "accion" es una de ACCIONES
- *     (se valida contra TRANSICIONES) o PASO_NOTA / PASO_ADJUNTO.
+ *     (se valida contra TRANSICIONES) o PASO_NOTA / PASO_ADJUNTO. Al completar,
+ *     "gestionRh" trae lo que carga RH (referencia y días descontados).
  *   - vistaPorAsignado: si el asignado actual ya la abrió (pestaña "Nuevas").
  * =============================================================
  */
@@ -207,6 +208,7 @@ export const SOLICITUDES_PRUEBA = [
         por: ROLES.RH,
         horas: 48,
         comentario: 'Licencia registrada en el sistema de liquidación de sueldos.',
+        gestionRh: { referenciaRh: 'LIQ-2026-0918', diasDescontados: 15 },
       },
     ],
   },
@@ -220,7 +222,13 @@ export const SOLICITUDES_PRUEBA = [
     adjuntosIniciales: [],
     pasos: [
       { accion: ACCIONES.APROBAR, por: ROLES.SUPERVISOR, horas: 3, comentario: '' },
-      { accion: ACCIONES.COMPLETAR, por: ROLES.RH, horas: 24, comentario: 'Registrado.' },
+      {
+        accion: ACCIONES.COMPLETAR,
+        por: ROLES.RH,
+        horas: 24,
+        comentario: 'Registrado.',
+        gestionRh: { referenciaRh: 'LIQ-2026-0927', diasDescontados: 1 },
+      },
     ],
   },
   // 10 · rechazada por el supervisor

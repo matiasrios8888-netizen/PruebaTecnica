@@ -20,7 +20,14 @@
  * =============================================================
  */
 
-import { ACCIONES, ESTADOS_FINALES, LIMITES_ADJUNTO, ROLES } from '../config/constantes.js';
+import {
+  ACCIONES,
+  LIMITE_BANDEJA,
+  LIMITES_ADJUNTO,
+  PESTANAS_BANDEJA,
+  ROLES,
+} from '../config/constantes.js';
+import { armarPestanas, pestanasVisibles } from './bandeja.js';
 import * as repositorio from '../data/solicitudesRepositorio.js';
 import { obtenerUsuarioPorId, listarUsuariosPorRol } from '../data/usuariosRepositorio.js';
 import { obtenerUsuarioActual } from './authServicio.js';
@@ -33,7 +40,7 @@ import {
   construirEventoNota,
   formatearNumeroSolicitud,
   puedeAgregarSeguimiento,
-  puedeCorregirDatos,
+  accesoACampos,
   validarArchivoAdjunto,
   validarDatosSolicitud,
 } from './flujoSolicitud.js';
@@ -91,10 +98,6 @@ function errorParaUsuario(error, mensajePorDefecto) {
   }
   return aErrorAplicacion(error, mensajePorDefecto);
 }
-
-/** Ordena solicitudes de la más reciente a la más vieja (por última actualización). */
-const porActualizacionDescendente = (a, b) =>
-  (b.fechaActualizacion?.toMillis?.() ?? 0) - (a.fechaActualizacion?.toMillis?.() ?? 0);
 
 // -------------------------------------------------------------
 // Crear
@@ -180,7 +183,7 @@ export async function crearSolicitud(datosFormulario, archivos = []) {
  *   adjuntos: import('../data/modelos.js').Adjunto[],
  *   acciones: string[],
  *   puedeAgregarSeguimiento: boolean,
- *   puedeCorregirDatos: boolean,
+ *   campos: Record<string, string>,
  * }>}
  * @throws {ErrorAplicacion} Si no existe o el usuario no tiene permiso para verla.
  */
@@ -211,7 +214,8 @@ export async function obtenerDetalle(id) {
       adjuntos,
       acciones: accionesDisponibles(solicitud, usuario),
       puedeAgregarSeguimiento: puedeAgregarSeguimiento(solicitud, usuario),
-      puedeCorregirDatos: puedeCorregirDatos(solicitud, usuario),
+      // ⚠️ IMPORTANTE: control de campos por rol (MATRIZ_CAMPOS) aplicado a este usuario.
+      campos: accesoACampos(solicitud, usuario),
     };
   } catch (error) {
     throw errorParaUsuario(error, 'No se pudo cargar la solicitud.');
@@ -219,26 +223,34 @@ export async function obtenerDetalle(id) {
 }
 
 /**
- * Listas del inicio: tareas asignadas al usuario y solicitudes en las que participa.
- * (La bandeja completa, con filtros y búsqueda, llega en la Fase 3.)
- * @returns {Promise<{ tareas: Solicitud[], solicitudes: Solicitud[] }>}
+ * Carga la bandeja del usuario: una lista por pestaña visible para su rol.
+ * Hace 2 consultas (3 para RH y admin) en paralelo; filtros, orden y búsqueda
+ * se aplican después en el navegador con bandeja.js.
+ *
+ * @returns {Promise<{ pestanas: Record<string, Solicitud[]>, visibles: string[], limiteAlcanzado: boolean }>}
+ *   limiteAlcanzado = alguna consulta llegó a LIMITE_BANDEJA (puede haber más solicitudes).
  * @throws {ErrorAplicacion}
  */
-export async function listarInicio() {
+export async function cargarBandeja() {
   try {
     const usuario = usuarioRequerido();
-    const [tareas, participa] = await Promise.all([
+    const visibles = pestanasVisibles(usuario);
+    const [asignadas, participa, todas] = await Promise.all([
       repositorio.listarAsignadasA(usuario.id),
       repositorio.listarDondeParticipa(usuario.id),
+      // 🔒 SEGURIDAD: la consulta sin filtro solo se hace para RH y admin (las reglas la rechazarían).
+      visibles.includes(PESTANAS_BANDEJA.TODAS) ? repositorio.listarTodas() : null,
     ]);
     return {
-      tareas: tareas.filter((s) => !ESTADOS_FINALES.includes(s.estadoActual)).sort(porActualizacionDescendente),
-      solicitudes: participa.sort(porActualizacionDescendente),
+      pestanas: armarPestanas({ asignadas, participa, todas }, usuario),
+      visibles,
+      limiteAlcanzado: [asignadas, participa, todas].some((lista) => lista?.length >= LIMITE_BANDEJA),
     };
   } catch (error) {
-    throw errorParaUsuario(error, 'No se pudieron cargar tus solicitudes.');
+    throw errorParaUsuario(error, 'No se pudo cargar la bandeja.');
   }
 }
+
 
 // -------------------------------------------------------------
 // Acciones del flujo
@@ -256,10 +268,12 @@ export async function listarInicio() {
  * @param {string} [opciones.comentario] - Obligatorio al devolver y al rechazar.
  * @param {{ tipoPermiso: string, fechaInicio: string, fechaFin: string, motivo: string }} [opciones.datosCorregidos]
  *   Solo al reenviar: los datos corregidos por el solicitante.
+ * @param {{ referenciaRh: string, diasDescontados: number|string }} [opciones.datosGestionRh]
+ *   Solo al completar: lo que carga RH (ver MATRIZ_CAMPOS).
  * @returns {Promise<void>}
  * @throws {ErrorAplicacion}
  */
-export async function ejecutarAccion(id, accion, { comentario = '', datosCorregidos } = {}) {
+export async function ejecutarAccion(id, accion, { comentario = '', datosCorregidos, datosGestionRh } = {}) {
   try {
     const usuario = usuarioRequerido();
     if (accion === ACCIONES.CREAR) throw new ErrorAplicacion('Acción no válida.', 'accionInvalida');
@@ -282,6 +296,7 @@ export async function ejecutarAccion(id, accion, { comentario = '', datosCorregi
         solicitante: { id: solicitud.solicitanteId, nombre: solicitud.solicitanteNombre },
         supervisor: supervisor ?? undefined,
         usuariosRh,
+        datosGestionRh,
       });
       // ⚠️ IMPORTANTE: los datos del permiso solo se corrigen al reenviar una devuelta.
       const correccion =
