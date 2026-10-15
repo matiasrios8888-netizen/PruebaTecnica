@@ -38,6 +38,7 @@ Todo bug o error detectado queda registrado acá, **aunque se corrija en el mome
 | BUG-005 | Los mensajes de error de los formularios no se ocultaban al corregir | Baja | ✅ Resuelto | Fase 2 | `fix/bugs-pre-fase-3` |
 | BUG-006 | Recargar los datos de prueba cerraba las sesiones abiertas | Baja | ✅ Resuelto | Fase 3 | `fix/BUG-006-seed-cierra-sesiones` |
 | BUG-007 | Desbordes horizontales: columna de acciones del detalle y tablas en celulares | Media | ✅ Resuelto | Fase 3 | `fix/BUG-007-desborde-columna-acciones` |
+| BUG-008 | El aviso de una acción seguía visible después de cerrar sesión | Baja | ✅ Resuelto | Fase 4 | `fix/BUG-008-avisos-entre-sesiones` |
 
 **Abiertos: 0**
 
@@ -114,6 +115,21 @@ Todo bug o error detectado queda registrado acá, **aunque se corrija en el mome
 - **Commit:** rama `fix/BUG-007-desborde-columna-acciones`.
 - **Test de regresión:** medición automática en el navegador del desborde de las tarjetas y del scroll horizontal de la página en 10 anchos (1550 → 320 px), para el detalle con acciones y para el inicio: todo en 0. En el celular, la tabla mantiene su scroll interno. `npm test` en verde.
 
+### BUG-008 · El aviso de una acción seguía visible después de cerrar sesión
+- **Detectado:** Fase 4, en la prueba integral automática. El aviso que se leyó después de dar de baja a un usuario era en realidad "SOL-0011: Completar gestión ✔", el aviso de la usuaria anterior.
+- **Severidad:** Baja. Dura como mucho 4 segundos, pero en una computadora compartida quien entra después puede ver una acción de la sesión anterior.
+- **Cómo reproducir:**
+  1. Ejecutar una acción que muestre un aviso; por ejemplo, agregar una nota.
+  2. Hacer clic en "Salir" antes de que pasen 4 segundos: el aviso sigue en la pantalla de login.
+  3. Si otra persona inicia sesión enseguida, también lo ve.
+- **Causa:** la zona de avisos (`#zonaAvisos`) se agrega directamente al `<body>`, fuera del contenedor que se redibuja en cada pantalla, para que un aviso sobreviva al cambio de pantalla. Cerrar sesión cambia la pantalla, pero no borraba los avisos pendientes.
+- **Solución:** `limpiarAvisos()` en `src/ui/utils/avisos.js`, llamada desde `src/main.js` cuando el observador de la sesión informa que no hay usuario (al cerrar sesión o al rechazar una sesión).
+- **Commit:** rama `fix/BUG-008-avisos-entre-sesiones`.
+- **Test de regresión:** prueba automática en el navegador:
+  - Ana agrega una nota y sale enseguida: la zona de avisos queda vacía en el login.
+  - Al volver a entrar, un aviso nuevo se muestra normalmente.
+  - `npm test` en verde (54 + 52).
+
 ---
 
 ## Observaciones (no son bugs de la app)
@@ -131,3 +147,11 @@ Los navegadores guardan en caché los módulos JavaScript. En desarrollo: Live S
 
 ### OBS-004 · (Entorno) git no podía autenticarse con GitHub
 La configuración global de git (`~/.gitconfig`) apuntaba a un `gh.exe` que ya no existía (carpeta temporal de otro proyecto). Se resolvió en la Fase 1 con `gh auth login` y `gh auth setup-git`.
+
+### OBS-005 · (Proceso) Un script temporal de pruebas se subió a `main`
+Al integrar la corrección del BUG-008, `git add -A` incluyó `scripts/tmp-prueba-fase4.mjs`, un script temporal que prepara escenarios de prueba con `firebase-admin`. La regla `scripts/tmp-*` del `.gitignore` se había agregado en la rama de la Fase 4, que todavía no estaba en `main`, así que en la rama `fix/` el archivo no estaba ignorado. El `git status` previo al commit lo mostraba (`A scripts/tmp-prueba-fase4.mjs`) y no se frenó.
+- **Impacto:** el script **no contiene la clave de servicio** (solo la lee de `scripts/serviceAccountKey.json`, que sigue ignorado y nunca se subió; se verificó con `git grep` que el repositorio no tiene claves privadas). Contiene emails de prueba y la contraseña inicial de cuentas de prueba que se borran al cerrar la fase.
+- **Corrección:** rama `fix/quitar-script-temporal`: `git rm --cached` (el archivo sigue en el disco) y la regla `scripts/tmp-*` en el `.gitignore` de `main`. No se reescribió el historial, porque no hay ningún secreto que borrar.
+- **Lección:**
+  - Antes de cada commit, revisar la lista de `git status` buscando archivos inesperados, sobre todo después de cambiar de rama.
+  - Las reglas del `.gitignore` que protegen archivos locales tienen que estar en `main`, no solo en una rama de trabajo.

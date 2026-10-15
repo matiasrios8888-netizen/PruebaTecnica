@@ -839,3 +839,48 @@ Construimos la bandeja de tareas: pestañas Pendientes, Nuevas y Enviadas (y Tod
   2. Entrar como `rh@bprosys.test` y ver el nombre nuevo en el encabezado.
   3. Para ver el caso del rol perdido: borrar el documento `roles/rh` desde la consola de Firebase, recargar "Roles" y crearlo de nuevo.
 - **Pendientes o dudas:** queda la prueba integral, la documentación y el cierre de la fase.
+
+## 2026-10-15 – Fase 4 – Corrección: BUG-008 (avisos que quedaban después de cerrar sesión)
+
+- **Qué hicimos:** en la prueba integral de la Fase 4 apareció un aviso de la sesión anterior ("SOL-0011: Completar gestión ✔") en la sesión del admin. El código de los avisos es de la Fase 2, que ya está en `main`, así que seguimos el flujo de BUGS.md:
+  1. registrar el bug;
+  2. crear una rama desde `main`;
+  3. corregir;
+  4. testear;
+  5. integrar a `main`.
+
+  Al cerrar sesión ahora se borran los avisos pendientes.
+- **Archivos creados o modificados:**
+  - `src/ui/utils/avisos.js`: nueva función `limpiarAvisos()`.
+  - `src/main.js`: la llama cuando no hay sesión.
+  - `BUGS.md`: BUG-008.
+- **Conceptos aprendidos:**
+  - **Elementos fuera de la pantalla:** la zona de avisos vive en el `<body>`, fuera del contenedor que se redibuja. Por eso sobrevive al cambio de pantalla, que es lo que se busca. La contracara es que hay que limpiarla a mano cuando el cambio es de usuario y no solo de pantalla.
+  - **Por qué se corrige en una rama aparte:** `main` es lo que se publica. La corrección se prueba en su rama y recién después se integra, sin mezclarla con el trabajo de la Fase 4, que todavía no terminó.
+- **Comandos usados:**
+  - `git switch main` + `git pull` + `git switch -c fix/BUG-008-avisos-entre-sesiones`.
+  - `npm test`: 54 + 52 en verde.
+  - Prueba en el navegador: nota → "Salir" inmediato → el login sin avisos; al volver a entrar, los avisos siguen funcionando.
+  - `git merge --no-ff` a `main` y `git push`.
+- **Cómo probarlo:** agregar una nota y apretar "Salir" enseguida. El aviso "Nota agregada" no tiene que quedar en la pantalla de login.
+- **Pendientes o dudas:** traer la corrección a `feature/mantenimiento` (`git merge main`) antes de cerrar la Fase 4.
+
+## 2026-10-15 – Fase 4 – Corrección: script temporal subido por error a `main` (OBS-005)
+
+- **Qué hicimos:**
+  - Al integrar el BUG-008 se subió a `main`, por error, el script temporal de pruebas `scripts/tmp-prueba-fase4.mjs`. La regla del `.gitignore` que lo excluye solo existía en la rama de la Fase 4.
+  - Lo sacamos del repositorio en una rama `fix/`, sin borrarlo del disco, y agregamos la regla al `.gitignore` de `main`.
+  - Verificamos que no se subió ninguna clave: el script solo lee `serviceAccountKey.json`, que sigue ignorado.
+- **Archivos creados o modificados:**
+  - `.gitignore`: `scripts/tmp-*`.
+  - `scripts/tmp-prueba-fase4.mjs`: deja de estar en el repositorio.
+  - `BUGS.md`: OBS-005, con la lección.
+- **Conceptos aprendidos:**
+  - **`git rm --cached`:** deja de seguir un archivo en git sin borrarlo del disco.
+  - **El `.gitignore` depende de la rama:** cada rama tiene su versión del `.gitignore`. Una regla agregada en una rama de trabajo no protege nada en las demás hasta que se integra.
+  - **Cuándo reescribir el historial:** si se hubiera subido una clave, no alcanzaría con borrarla en un commit nuevo. Habría que revocarla en Firebase y, además, limpiar el historial. Acá no había ningún secreto, así que alcanza con un commit que lo saque.
+- **Comandos usados:**
+  - `git grep -n "BEGIN PRIVATE KEY\|private_key" HEAD`: sin resultados.
+  - `git switch -c fix/quitar-script-temporal`, `git rm --cached scripts/tmp-prueba-fase4.mjs`, commit, `git merge --no-ff` a `main` y `git push`.
+- **Cómo probarlo:** `git ls-files scripts` ya no lista el script, y `git check-ignore -v scripts/tmp-prueba-fase4.mjs` muestra la regla que lo ignora.
+- **Pendientes o dudas:** ninguno.

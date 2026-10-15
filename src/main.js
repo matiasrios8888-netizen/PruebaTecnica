@@ -10,7 +10,7 @@
  *   - Volver a resolver la ruta cada vez que alguien inicia o cierra sesión.
  *
  * Depende de: src/services/authServicio.js, src/ui/router.js, src/ui/pantallas/*,
- *   src/config/constantes.js
+ *   src/ui/utils/avisos.js, src/config/constantes.js
  * =============================================================
  */
 
@@ -39,6 +39,7 @@ import { renderizarUsuarios } from './ui/pantallas/usuariosPantalla.js';
 import { renderizarAltaUsuario } from './ui/pantallas/altaUsuarioPantalla.js';
 import { renderizarFichaUsuario } from './ui/pantallas/fichaUsuarioPantalla.js';
 import { renderizarRoles } from './ui/pantallas/rolesPantalla.js';
+import { limpiarAvisos } from './ui/utils/avisos.js';
 
 const contenedor = document.getElementById('app');
 
@@ -64,6 +65,8 @@ observarSesion((usuario) => {
   if (usuario) {
     resolverRuta(); // respeta la ruta pedida (si era #/login, el router lleva a inicio)
   } else {
+    // Los avisos de la sesión anterior no tienen que verlos quien entra después (BUGS.md · BUG-008).
+    limpiarAvisos();
     navegar(RUTA_LOGIN);
   }
 });
