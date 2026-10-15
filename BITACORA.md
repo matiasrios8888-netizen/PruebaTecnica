@@ -435,3 +435,21 @@ Construimos el flujo completo Solicitar → Aprobar → Gestionar RH de punta a 
   2. En **Nueva solicitud**, enviá vacío y después elegí un tipo: el error desaparece.
   3. Recorré el flujo completo: todo sigue funcionando.
 - **Pendientes o dudas:** ninguno abierto. OBS-003 (caché) se verifica en el deploy de la Fase 6.
+
+---
+
+## 2026-10-15 – Antes de la Fase 3 – Paso: flujo de corrección de bugs en una rama por bug
+
+- **Qué hicimos:** formalizamos cómo se corrige un bug para no arriesgar nunca `main`: **Detectar → Ramificar → Corregir → Testear → Integrar**, con una rama `fix/BUG-NNN-…` por cada bug.
+- **Archivos creados o modificados:**
+  - `CLAUDE.md`: regla con el flujo de 5 pasos, qué hacer si la corrección sale mal, y qué hacer con bugs que aparecen dentro de una rama `feature/...`.
+  - `BUGS.md`: la sección "Cómo se usa" refleja el mismo flujo, con una nota sobre BUG-004 y BUG-005 (corregidos juntos antes de esta regla).
+- **Conceptos aprendidos:**
+  - **`main` siempre publicable:** es lo que se despliega en Vercel. Ningún cambio llega ahí sin pasar los tests.
+  - **Una rama por bug:** si una corrección sale mal, se descarta solo esa rama, sin frenar otras correcciones ni la rama principal.
+  - **Descartar una rama:** `git switch main` y `git branch -D fix/...` borran la rama local con todos sus cambios. `main` no se entera.
+- **Comandos usados:**
+  - `git switch -c docs/proceso-correccion-bugs`: incluso este cambio de documentación se hace fuera de `main`.
+  - `git merge --no-ff docs/proceso-correccion-bugs`: integra el cambio a `main`.
+- **Cómo probarlo:** leer la sección "Registro de bugs" de `CLAUDE.md` y "Cómo se usa" de `BUGS.md`.
+- **Pendientes o dudas:** ninguno. Siguiente: aprobación del plan de la Fase 3.

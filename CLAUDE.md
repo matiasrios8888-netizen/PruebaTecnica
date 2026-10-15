@@ -63,7 +63,15 @@ El desarrollador es junior y necesita **entender** todo lo que se construye (des
 ### Registro de bugs (BUGS.md)
 - Todo bug o error se registra en `BUGS.md` **apenas se detecta**, aunque se corrija en el momento: ID correlativo `BUG-NNN`, fase, severidad (alta / media / baja), estado, cómo reproducirlo, causa, solución, commit y test de regresión.
 - Lo que no es un bug de la app (comportamiento del SDK, del navegador o del entorno) va en la sección **Observaciones** de `BUGS.md`, con la explicación.
-- **Antes de iniciar una nueva fase:** corregir todos los bugs abiertos en una rama `fix/bugs-pre-fase-N`, **sin romper nada**: correr `npm test` (desde `scripts/`) y una prueba manual del flujo afectado; recién después merge a `main` y empezar la fase.
+- **Nunca se corrige un bug directamente en `main`.** `main` siempre tiene que funcionar (es lo que se publica). Flujo obligatorio:
+  1. **Detectar** → registrar en `BUGS.md` (estado *Abierto*).
+  2. **Ramificar** → desde `main` actualizado, **una rama por bug**: `fix/BUG-NNN-descripcion-corta`.
+  3. **Corregir** en esa rama (estado *En curso*).
+  4. **Testear** → `npm test` (desde `scripts/`), test de regresión y prueba manual del flujo afectado.
+  5. **Integrar** → recién con todo en verde: merge `--no-ff` a `main` y push (estado *Resuelto*, con el commit).
+  - Si la corrección sale mal, se descarta la rama (`git switch main` + `git branch -D fix/...`) y `main` queda intacto.
+- Un bug que aparece dentro de una rama `feature/...`, causado por código de esa misma rama (todavía no llegó a `main`), se corrige en esa rama antes del merge, pero igual se registra.
+- **Antes de iniciar una nueva fase no puede quedar ningún bug abierto.**
 - Siempre que se pueda, agregar un test de regresión. Si ayuda a entender el código, referenciar el bug con `// BUGS.md · BUG-NNN`.
 
 ---

@@ -4,7 +4,17 @@ Todo bug o error detectado queda registrado acá, **aunque se corrija en el mome
 
 **Cómo se usa** (regla de `CLAUDE.md`):
 - Cada bug lleva un ID correlativo `BUG-NNN` y estos datos: fase en que se detectó, severidad, estado, cómo reproducirlo, causa, solución, commit y test de regresión.
-- **Antes de iniciar una nueva fase** se corrigen todos los bugs abiertos en una rama `fix/bugs-pre-fase-N`, se corre `npm test` (desde `scripts/`) y una prueba manual del flujo afectado, y recién después se hace el merge a `main`.
+- **Nunca se corrige en `main`.** Flujo de cada bug:
+
+  ```
+  Detectar → Ramificar → Corregir → Testear → Integrar
+  (Abierto)  fix/BUG-NNN-…  (En curso)  npm test +   merge a main
+                                        regresión +  (Resuelto)
+                                        prueba manual
+  ```
+
+  Una rama por bug, creada desde `main` actualizado. Si la corrección sale mal, se descarta la rama y `main` queda intacto. Un bug causado por código de una rama `feature/...` que todavía no llegó a `main` se corrige en esa misma rama antes del merge.
+- **Antes de iniciar una nueva fase** no puede quedar ningún bug abierto.
 - Lo que no es un bug de la app (comportamiento del SDK, del navegador o del entorno) va en **Observaciones**, con la explicación de por qué no se corrige.
 - Cuando ayuda a entender por qué existe un código, se lo referencia con un comentario `// BUGS.md · BUG-NNN`.
 
@@ -28,6 +38,8 @@ Todo bug o error detectado queda registrado acá, **aunque se corrija en el mome
 | BUG-005 | Los mensajes de error de los formularios no se ocultaban al corregir | Baja | ✅ Resuelto | Fase 2 | `fix/bugs-pre-fase-3` |
 
 **Abiertos: 0**
+
+> BUG-004 y BUG-005 se corrigieron juntos en la rama `fix/bugs-pre-fase-3`, antes de existir la regla de "una rama por bug". Desde ahora cada bug va en su propia rama `fix/BUG-NNN-…`.
 
 ---
 
