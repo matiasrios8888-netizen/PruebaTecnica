@@ -34,7 +34,7 @@ import {
 import { dibujarMarco } from '../componentes/marco.js';
 import { htmlTablaSolicitudes, conectarFilas } from '../componentes/tablaSolicitudes.js';
 import { navegar, rutaBandeja, RUTA_NUEVA_SOLICITUD } from '../router.js';
-import { escaparHtml } from '../utils/html.js';
+import { escaparHtml, htmlOpciones } from '../utils/html.js';
 import { nombreRol } from '../utils/formato.js';
 
 /** Texto cuando una pestaña está vacía (sin filtros). */
@@ -123,17 +123,6 @@ function dibujarPestanas(principal, bandeja, pestanaActual) {
     .join('');
 }
 
-/** Opciones de un <select> a partir de un objeto { clave: nombre }, marcando la elegida. */
-function opciones(nombres, elegida, textoTodos) {
-  const primera = textoTodos ? `<option value="">${textoTodos}</option>` : '';
-  return (
-    primera +
-    Object.entries(nombres)
-      .map(([clave, nombre]) => `<option value="${clave}" ${clave === elegida ? 'selected' : ''}>${escaparHtml(nombre)}</option>`)
-      .join('')
-  );
-}
-
 function htmlFiltros() {
   const { filtros, orden } = preferencias;
   const nombresTipo = Object.fromEntries(Object.entries(CONFIG_TIPOS_PERMISO).map(([clave, tipo]) => [clave, tipo.nombre]));
@@ -144,17 +133,17 @@ function htmlFiltros() {
         <input type="search" name="texto" value="${escaparHtml(filtros.texto)}" placeholder="Número, persona, tipo o motivo" />
       </label>
       <label class="campo"><span>Estado</span>
-        <select name="estado">${opciones(NOMBRES_ESTADO, filtros.estado, 'Todos')}</select></label>
+        <select name="estado">${htmlOpciones(NOMBRES_ESTADO, filtros.estado, 'Todos')}</select></label>
       <label class="campo"><span>Etapa</span>
-        <select name="etapa">${opciones(NOMBRES_ETAPA, filtros.etapa, 'Todas')}</select></label>
+        <select name="etapa">${htmlOpciones(NOMBRES_ETAPA, filtros.etapa, 'Todas')}</select></label>
       <label class="campo"><span>Tipo</span>
-        <select name="tipoPermiso">${opciones(nombresTipo, filtros.tipoPermiso, 'Todos')}</select></label>
+        <select name="tipoPermiso">${htmlOpciones(nombresTipo, filtros.tipoPermiso, 'Todos')}</select></label>
       <label class="campo"><span>Permisos desde</span>
         <input type="date" name="desde" value="${escaparHtml(filtros.desde)}" /></label>
       <label class="campo"><span>hasta</span>
         <input type="date" name="hasta" value="${escaparHtml(filtros.hasta)}" /></label>
       <label class="campo"><span>Ordenar por</span>
-        <select name="orden">${opciones(NOMBRES_ORDEN, orden)}</select></label>
+        <select name="orden">${htmlOpciones(NOMBRES_ORDEN, orden)}</select></label>
       <div class="filtros__acciones">
         <button type="reset" class="boton boton--chico" id="limpiarFiltros">Limpiar filtros</button>
       </div>

@@ -39,6 +39,7 @@ import {
   NUMERACION_SOLICITUD,
   ROLES,
   NOMBRES_ROL,
+  DESCRIPCIONES_ROL,
   PERMISOS_POR_ROL,
   ESTADOS_FINALES,
   ACCIONES,
@@ -54,7 +55,6 @@ import {
   PASO_ADJUNTO,
   PASSWORD_PRUEBA,
   USUARIOS_PRUEBA,
-  DESCRIPCIONES_ROL,
   SOLICITUDES_PRUEBA,
 } from './datosPrueba.mjs';
 
@@ -301,7 +301,7 @@ async function prepararUsuariosAuth(auth) {
       console.log(`  + Auth: ${datos.email} (creado)`);
     }
     // "id" y "activo" con la forma de Usuario (modelos.js), que espera flujoSolicitud.js.
-    resultado[clave] = { ...datos, uid, id: uid, activo: true };
+    resultado[clave] = { ...datos, uid, id: uid, activo: datos.activo ?? true };
   }
   return resultado;
 }
@@ -320,7 +320,7 @@ async function escribirUsuariosYRoles(db, usuarios) {
       rol: usuario.rol,
       supervisorId: usuario.supervisor ? usuarios[usuario.supervisor].uid : null,
       area: usuario.area,
-      activo: true,
+      activo: usuario.activo,
       fechaCreacion: FieldValue.serverTimestamp(),
       fechaActualizacion: FieldValue.serverTimestamp(),
     });
@@ -330,7 +330,6 @@ async function escribirUsuariosYRoles(db, usuarios) {
       nombre: NOMBRES_ROL[rol],
       descripcion: DESCRIPCIONES_ROL[rol],
       permisos: PERMISOS_POR_ROL[rol],
-      activo: true,
     });
   }
   await lote.commit();
@@ -393,7 +392,7 @@ async function main() {
     console.log('  ✔ Conexión con Firestore (la base de datos existe)');
     // uids ficticios: alcanzan para validar los guiones.
     usuarios = Object.fromEntries(
-      Object.entries(USUARIOS_PRUEBA).map(([k, datos]) => [k, { ...datos, uid: `uid-${k}`, id: `uid-${k}`, activo: true }]),
+      Object.entries(USUARIOS_PRUEBA).map(([k, datos]) => [k, { ...datos, uid: `uid-${k}`, id: `uid-${k}`, activo: datos.activo ?? true }]),
     );
   } else {
     console.log('1) Usuarios en Authentication');
@@ -427,7 +426,9 @@ async function main() {
     })),
   );
   console.log('Usuarios de prueba (contraseña común):', PASSWORD_PRUEBA);
-  for (const u of Object.values(USUARIOS_PRUEBA)) console.log(`  ${u.rol.padEnd(10)} ${u.email}`);
+  for (const u of Object.values(USUARIOS_PRUEBA)) {
+    console.log(`  ${u.rol.padEnd(10)} ${u.email}${u.activo === false ? '  (dado de baja)' : ''}`);
+  }
 }
 
 main().catch((error) => {

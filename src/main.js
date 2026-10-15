@@ -26,11 +26,19 @@ import {
   RUTA_BANDEJA_PESTANA,
   RUTA_NUEVA_SOLICITUD,
   RUTA_DETALLE_SOLICITUD,
+  RUTA_USUARIOS,
+  RUTA_NUEVO_USUARIO,
+  RUTA_FICHA_USUARIO,
+  RUTA_ROLES,
 } from './ui/router.js';
 import { renderizarLogin } from './ui/pantallas/loginPantalla.js';
 import { renderizarBandeja } from './ui/pantallas/bandejaPantalla.js';
 import { renderizarNuevaSolicitud } from './ui/pantallas/nuevaSolicitudPantalla.js';
 import { renderizarDetalleSolicitud } from './ui/pantallas/detalleSolicitudPantalla.js';
+import { renderizarUsuarios } from './ui/pantallas/usuariosPantalla.js';
+import { renderizarAltaUsuario } from './ui/pantallas/altaUsuarioPantalla.js';
+import { renderizarFichaUsuario } from './ui/pantallas/fichaUsuarioPantalla.js';
+import { renderizarRoles } from './ui/pantallas/rolesPantalla.js';
 import { limpiarAvisos } from './ui/utils/avisos.js';
 
 const contenedor = document.getElementById('app');
@@ -43,6 +51,11 @@ registrarRuta(RUTA_NUEVA_SOLICITUD, renderizarNuevaSolicitud, { roles: [ROLES.IN
 // Cualquier usuario logueado puede pedir un detalle; si no le corresponde verlo,
 // firestore.rules rechaza la lectura y la pantalla muestra el error.
 registrarRuta(RUTA_DETALLE_SOLICITUD, renderizarDetalleSolicitud);
+// 🔒 SEGURIDAD: el mantenimiento es solo del admin (también lo exigen los servicios y las reglas).
+registrarRuta(RUTA_USUARIOS, renderizarUsuarios, { roles: [ROLES.ADMIN] });
+registrarRuta(RUTA_NUEVO_USUARIO, renderizarAltaUsuario, { roles: [ROLES.ADMIN] });
+registrarRuta(RUTA_FICHA_USUARIO, renderizarFichaUsuario, { roles: [ROLES.ADMIN] });
+registrarRuta(RUTA_ROLES, renderizarRoles, { roles: [ROLES.ADMIN] });
 
 iniciarRouter(contenedor, obtenerUsuarioActual);
 

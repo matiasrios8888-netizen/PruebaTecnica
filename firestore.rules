@@ -40,6 +40,16 @@ service cloud.firestore {
     function roles() { return ['iniciador', 'supervisor', 'rh', 'admin']; }
     function estadosFinales() { return ['completada', 'rechazada', 'cancelada']; }
 
+    // Permisos de fábrica de cada rol (PERMISOS_POR_ROL).
+    function permisosPorRol() {
+      return {
+        'iniciador': ['solicitud.crear'],
+        'supervisor': ['solicitud.aprobar', 'solicitud.devolver', 'solicitud.rechazar'],
+        'rh': ['solicitud.gestionarRh', 'solicitud.verTodas', 'reportes.ver'],
+        'admin': ['solicitud.verTodas', 'usuarios.gestionar', 'roles.gestionar', 'reportes.ver']
+      };
+    }
+
     // Tope de días por tipo de permiso (CONFIG_TIPOS_PERMISO).
     function diasMaximosPorTipo() {
       return {
@@ -106,16 +116,34 @@ service cloud.firestore {
     // =========================================================
     match /usuarios/{uid} {
 
+      // Largos máximos: LIMITES_USUARIO en constantes.js.
       function usuarioValido(d) {
         return d.keys().hasOnly(['nombre', 'email', 'rol', 'supervisorId', 'area', 'activo',
                                  'fechaCreacion', 'fechaActualizacion'])
           && textoEntre(d.nombre, 1, 100)
           && textoEntre(d.email, 3, 200)
           && d.rol in roles()
-          && (d.supervisorId == null || d.supervisorId is string)
-          && d.area is string
+          && textoEntre(d.area, 1, 60)
           && d.activo is bool
+          && supervisorCoherente(d)
           && d.fechaActualizacion == request.time;
+      }
+
+      function esSupervisorActivo(id) {
+        return exists(rutaUsuario(id))
+          && get(rutaUsuario(id)).data.rol == 'supervisor'
+          && get(rutaUsuario(id)).data.activo == true;
+      }
+
+      // ⚠️ IMPORTANTE: solo el iniciador tiene supervisor (quien aprueba sus solicitudes)
+      // y no puede ser él mismo. Mientras el iniciador esté activo, su supervisor también
+      // tiene que estarlo: si no, la regla de creación de solicitudes lo rechazaría.
+      function supervisorCoherente(d) {
+        return d.rol == 'iniciador'
+          ? (d.supervisorId is string
+              && d.supervisorId != uid
+              && (d.activo == false || esSupervisorActivo(d.supervisorId)))
+          : d.supervisorId == null;
       }
 
       // Cada usuario puede leer SU perfil aunque esté inactivo: así el login
@@ -126,16 +154,25 @@ service cloud.firestore {
       // se necesita para mostrar nombres, asignar tareas y armar reportes.
       allow read: if habilitado();
 
-      // 🔒 SEGURIDAD: solo el admin da de alta o edita usuarios (Fase 4).
+      // 🔒 SEGURIDAD: solo el admin da de alta o edita usuarios. Una cuenta creada en
+      // Auth por fuera de la app no puede escribirse su propio perfil: sin perfil activo
+      // no puede hacer nada. Un usuario nuevo siempre empieza activo.
       allow create: if esAdmin()
         && usuarioValido(request.resource.data)
+        && request.resource.data.activo == true
         && request.resource.data.fechaCreacion == request.time;
 
       // El email no se edita (tiene que coincidir con la cuenta de Auth)
       // y la fecha de creación no se reescribe.
+      // 🔒 SEGURIDAD: el admin no puede darse de baja ni cambiarse el rol a sí mismo:
+      // así siempre queda al menos un admin activo.
+      // ⚠️ IMPORTANTE: los demás bloqueos de una baja o un cambio de rol (trámites
+      // abiertos, colaboradores a cargo, último RH) los controla el servicio, porque
+      // las reglas no pueden contar documentos (DECISIONES.md #24).
       allow update: if esAdmin()
         && usuarioValido(request.resource.data)
-        && !camposModificados().hasAny(['email', 'fechaCreacion']);
+        && !camposModificados().hasAny(['email', 'fechaCreacion'])
+        && !(uid == request.auth.uid && camposModificados().hasAny(['rol', 'activo']));
 
       // Baja lógica: los usuarios nunca se borran (activo = false).
       allow delete: if false;
@@ -144,16 +181,33 @@ service cloud.firestore {
     // =========================================================
     // roles/{rolId}
     // =========================================================
+    // ⚠️ IMPORTANTE: el catálogo tiene solo los 4 roles del sistema, porque el flujo
+    // y estas reglas dependen de sus claves. Desde la app se editan el nombre visible y
+    // la descripción. Los permisos los define el flujo y no cambian. Un rol solo se
+    // puede crear si falta, y con sus permisos de fábrica (DECISIONES.md #25).
     match /roles/{rolId} {
       allow read: if habilitado();
 
-      allow create, update: if esAdmin()
-        && request.resource.data.keys().hasOnly(['nombre', 'descripcion', 'permisos', 'activo'])
-        && textoEntre(request.resource.data.nombre, 1, 60)
-        && request.resource.data.descripcion is string
-        && request.resource.data.permisos is list
-        && request.resource.data.activo is bool;
+      // Largos máximos: LIMITES_ROL en constantes.js.
+      function rolValido(d) {
+        return d.keys().hasOnly(['nombre', 'descripcion', 'permisos'])
+          && textoEntre(d.nombre, 1, 60)
+          && textoEntre(d.descripcion, 0, 300)
+          && d.permisos is list;
+      }
 
+      allow create: if esAdmin()
+        && rolId in roles()
+        && rolValido(request.resource.data)
+        && request.resource.data.permisos == permisosPorRol()[rolId];
+
+      allow update: if esAdmin()
+        && rolId in roles()
+        && rolValido(request.resource.data)
+        && !camposModificados().hasAny(['permisos']);
+
+      // Los roles no se borran: si alguno se pierde (por ejemplo, desde la consola
+      // de Firebase), el admin lo vuelve a crear desde la app.
       allow delete: if false;
     }
 

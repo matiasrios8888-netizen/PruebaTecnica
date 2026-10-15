@@ -12,7 +12,8 @@
  *   Levanta el emulador con el proyecto ficticio "demo-permisos", corre los
  *   tests y lo apaga. Requiere Java y Firebase CLI.
  *
- * Depende de: @firebase/rules-unit-testing, firebase (SDK cliente), firestore.rules
+ * Depende de: @firebase/rules-unit-testing, firebase (SDK cliente), firestore.rules,
+ *   src/config/constantes.js (permisos y descripciones de fábrica de los roles)
  * =============================================================
  */
 
@@ -40,6 +41,8 @@ import {
   Timestamp,
   setLogLevel,
 } from 'firebase/firestore';
+// Las reglas tienen una copia de estos valores: si difieren, los tests de roles fallan.
+import { DESCRIPCIONES_ROL, NOMBRES_ROL, PERMISOS_POR_ROL } from '../../src/config/constantes.js';
 
 // Los rechazos esperados (assertFails) hacen que el SDK imprima PERMISSION_DENIED
 // en consola. Se silencian: el resultado de cada test ya informa si algo falla.
@@ -178,6 +181,15 @@ beforeEach(async () => {
     }
     await setDoc(doc(db, 'contadores', 'solicitudes'), { ultimoNumero: ULTIMO_NUMERO });
 
+    // Catálogo de roles SIN "admin", para probar la creación de un rol faltante.
+    for (const clave of ['iniciador', 'supervisor', 'rh']) {
+      await setDoc(doc(db, 'roles', clave), {
+        nombre: NOMBRES_ROL[clave],
+        descripcion: DESCRIPCIONES_ROL[clave],
+        permisos: [...PERMISOS_POR_ROL[clave]],
+      });
+    }
+
     await setDoc(doc(db, 'solicitudes', 's1'), solicitudBase());
     await setDoc(doc(db, 'solicitudes/s1/historial/e0'), { ...evento('ini', 'notaAgregada', {}, 'vieja'), fecha: Timestamp.now() });
     await setDoc(doc(db, 'solicitudes/s1/historial/e1'), { ...evento('ini', 'creada'), fecha: Timestamp.now() });
@@ -261,6 +273,137 @@ describe('usuarios', () => {
 
   test('nadie borra usuarios (baja lógica)', async () => {
     await assertFails(deleteDoc(doc(comoUsuario('admin'), 'usuarios/ini')));
+  });
+});
+
+// -------------------------------------------------------------
+// usuarios: mantenimiento (alta, edición, baja y reactivación)
+// -------------------------------------------------------------
+
+/** Perfil completo de un usuario nuevo, como lo escribe el alta de la app. */
+function perfilNuevo(cambios = {}) {
+  return {
+    nombre: 'Lucía Torres',
+    email: 'lucia.torres@bprosys.test',
+    rol: 'iniciador',
+    supervisorId: 'sup',
+    area: 'Ventas',
+    activo: true,
+    fechaCreacion: serverTimestamp(),
+    fechaActualizacion: serverTimestamp(),
+    ...cambios,
+  };
+}
+
+/** El usuario "como" edita el perfil "uid". */
+const editarUsuario = (uid, cambios, como = 'admin') =>
+  updateDoc(doc(comoUsuario(como), 'usuarios', uid), { ...cambios, fechaActualizacion: serverTimestamp() });
+
+/** Cambia perfiles sin pasar por las reglas (para preparar un escenario). */
+async function prepararPerfiles(cambiosPorUid) {
+  await entorno.withSecurityRulesDisabled(async (contexto) => {
+    for (const [uid, cambios] of Object.entries(cambiosPorUid)) {
+      await updateDoc(doc(contexto.firestore(), 'usuarios', uid), cambios);
+    }
+  });
+}
+
+describe('usuarios: mantenimiento', () => {
+  test('el admin da de alta un iniciador con un supervisor activo', async () => {
+    await assertSucceeds(setDoc(doc(comoUsuario('admin'), 'usuarios/nuevo'), perfilNuevo()));
+  });
+
+  test('solo el admin da de alta usuarios; una cuenta nueva no se crea su propio perfil', async () => {
+    await assertFails(setDoc(doc(comoUsuario('rh'), 'usuarios/nuevo'), perfilNuevo()));
+    await assertFails(setDoc(doc(comoUsuario('nuevo'), 'usuarios/nuevo'), perfilNuevo()));
+  });
+
+  test('un usuario nuevo no se crea dado de baja', async () => {
+    await assertFails(setDoc(doc(comoUsuario('admin'), 'usuarios/nuevo'), perfilNuevo({ activo: false })));
+  });
+
+  test('el iniciador necesita un supervisor existente, con rol supervisor y activo', async () => {
+    const db = comoUsuario('admin');
+    await assertFails(setDoc(doc(db, 'usuarios/nuevo'), perfilNuevo({ supervisorId: null })));
+    await assertFails(setDoc(doc(db, 'usuarios/nuevo'), perfilNuevo({ supervisorId: 'noExiste' })));
+    await assertFails(setDoc(doc(db, 'usuarios/nuevo'), perfilNuevo({ supervisorId: 'rh' })));
+    await prepararPerfiles({ otroSup: { activo: false } });
+    await assertFails(setDoc(doc(db, 'usuarios/nuevo'), perfilNuevo({ supervisorId: 'otroSup' })));
+  });
+
+  test('los demás roles no llevan supervisor', async () => {
+    const db = comoUsuario('admin');
+    await assertFails(setDoc(doc(db, 'usuarios/nuevo'), perfilNuevo({ rol: 'supervisor', supervisorId: 'sup' })));
+    await assertSucceeds(setDoc(doc(db, 'usuarios/nuevo'), perfilNuevo({ rol: 'supervisor', supervisorId: null })));
+  });
+
+  test('un iniciador no puede ser su propio supervisor', async () => {
+    await assertFails(editarUsuario('sup', { rol: 'iniciador', supervisorId: 'sup' }));
+  });
+
+  test('el área es obligatoria', async () => {
+    await assertFails(editarUsuario('ini', { area: '' }));
+  });
+
+  test('el admin da de baja y reactiva a otro usuario', async () => {
+    await assertSucceeds(editarUsuario('otroIni', { activo: false }));
+    await assertSucceeds(editarUsuario('otroIni', { activo: true }));
+  });
+
+  test('el admin no puede darse de baja ni cambiarse el rol, pero sí editar su nombre', async () => {
+    await assertFails(editarUsuario('admin', { activo: false }));
+    await assertFails(editarUsuario('admin', { rol: 'rh' }));
+    await assertSucceeds(editarUsuario('admin', { nombre: 'Martín S. Sosa' }));
+  });
+
+  test('no se reactiva un iniciador cuyo supervisor está dado de baja, salvo que se le asigne otro', async () => {
+    await prepararPerfiles({ otroSup: { activo: false }, otroIni: { activo: false } });
+    await assertFails(editarUsuario('otroIni', { activo: true }));
+    // Mientras está dado de baja se lo puede editar aunque su supervisor también lo esté.
+    await assertSucceeds(editarUsuario('otroIni', { area: 'Comercial' }));
+    await assertSucceeds(editarUsuario('otroIni', { activo: true, supervisorId: 'sup' }));
+  });
+});
+
+// -------------------------------------------------------------
+// roles
+// -------------------------------------------------------------
+
+describe('roles', () => {
+  test('cualquier usuario activo lee el catálogo; uno dado de baja, no', async () => {
+    await assertSucceeds(getDocs(collection(comoUsuario('ini'), 'roles')));
+    await assertFails(getDocs(collection(comoUsuario('inactivo'), 'roles')));
+  });
+
+  test('el admin edita el nombre y la descripción de un rol', async () => {
+    await assertSucceeds(
+      updateDoc(doc(comoUsuario('admin'), 'roles/rh'), { nombre: 'RRHH', descripcion: 'Liquida los permisos aprobados' }),
+    );
+  });
+
+  test('los permisos de un rol no se editan', async () => {
+    await assertFails(
+      updateDoc(doc(comoUsuario('admin'), 'roles/iniciador'), { permisos: ['solicitud.crear', 'solicitud.aprobar'] }),
+    );
+  });
+
+  test('solo el admin edita roles', async () => {
+    await assertFails(updateDoc(doc(comoUsuario('rh'), 'roles/rh'), { nombre: 'Jefes de RH' }));
+  });
+
+  test('el admin recrea un rol del sistema que falta, solo con sus permisos de fábrica', async () => {
+    const db = comoUsuario('admin');
+    const rol = { nombre: NOMBRES_ROL.admin, descripcion: DESCRIPCIONES_ROL.admin };
+    await assertFails(setDoc(doc(db, 'roles/admin'), { ...rol, permisos: [...PERMISOS_POR_ROL.admin, 'solicitud.aprobar'] }));
+    await assertSucceeds(setDoc(doc(db, 'roles/admin'), { ...rol, permisos: [...PERMISOS_POR_ROL.admin] }));
+  });
+
+  test('no se crean roles fuera de los 4 del sistema', async () => {
+    await assertFails(setDoc(doc(comoUsuario('admin'), 'roles/auditor'), { nombre: 'Auditor', descripcion: '', permisos: [] }));
+  });
+
+  test('los roles no se borran', async () => {
+    await assertFails(deleteDoc(doc(comoUsuario('admin'), 'roles/rh')));
   });
 });
 

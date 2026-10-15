@@ -133,6 +133,19 @@ export function listarDondeParticipa(uid) {
 }
 
 /**
+ * TODAS las solicitudes en las que participa un usuario (sin tope ni orden),
+ * para saber si tiene trámites abiertos antes de darlo de baja o cambiarle el rol.
+ * 🔒 SEGURIDAD: solo la usa el admin, que puede leer todas las solicitudes.
+ * No necesita índice compuesto: es una sola condición sobre "participantes".
+ * @param {string} uid
+ * @returns {Promise<Solicitud[]>}
+ */
+export async function listarParticipacionesDe(uid) {
+  const resultado = await getDocs(query(coleccionSolicitudes(), where('participantes', 'array-contains', uid)));
+  return resultado.docs.map(conId);
+}
+
+/**
  * Todas las solicitudes (pestaña "Todas", solo RH y admin).
  * 🔒 SEGURIDAD: firestore.rules solo permite esta consulta sin filtro a RH y admin.
  * @returns {Promise<Solicitud[]>} Más recientes primero.

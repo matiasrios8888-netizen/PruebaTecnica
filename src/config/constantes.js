@@ -107,9 +107,28 @@ export const NOMBRES_ROL = Object.freeze({
 });
 
 /**
+ * Descripción de fábrica de cada rol. La usan el script de datos de prueba y la
+ * gestión de roles, para recrear un rol que falte en el catálogo.
+ */
+export const DESCRIPCIONES_ROL = Object.freeze({
+  [ROLES.INICIADOR]: 'Crea solicitudes de permiso, adjunta documentación y corrige las devueltas',
+  [ROLES.SUPERVISOR]: 'Aprueba, devuelve o rechaza las solicitudes de su equipo',
+  [ROLES.RH]: 'Gestiona en Recursos Humanos las solicitudes aprobadas y consulta reportes',
+  [ROLES.ADMIN]: 'Administra usuarios y roles, y consulta todas las solicitudes y reportes',
+});
+
+/**
+ * 🔒 SEGURIDAD: largos máximos de un rol del catálogo; firestore.rules valida los mismos.
+ */
+export const LIMITES_ROL = Object.freeze({
+  largoMaximoNombre: 60,
+  largoMaximoDescripcion: 300,
+});
+
+/**
  * Permisos (capacidades) que puede tener un rol. Se guardan en el campo
- * "permisos" de cada documento de la colección "roles" y se usan en la
- * gestión de roles (Fase 4).
+ * "permisos" de cada documento de la colección "roles" y se muestran en la
+ * gestión de roles.
  */
 export const PERMISOS = Object.freeze({
   SOLICITUD_CREAR: 'solicitud.crear',
@@ -123,7 +142,27 @@ export const PERMISOS = Object.freeze({
   REPORTES_VER: 'reportes.ver',
 });
 
-/** Permisos iniciales de cada rol (los usa el script de datos de prueba). */
+/** Texto para mostrar de cada permiso (pantalla de roles). */
+export const NOMBRES_PERMISO = Object.freeze({
+  [PERMISOS.SOLICITUD_CREAR]: 'Crear solicitudes',
+  [PERMISOS.SOLICITUD_APROBAR]: 'Aprobar solicitudes',
+  [PERMISOS.SOLICITUD_DEVOLVER]: 'Devolver solicitudes para corregir',
+  [PERMISOS.SOLICITUD_RECHAZAR]: 'Rechazar solicitudes',
+  [PERMISOS.SOLICITUD_GESTIONAR_RH]: 'Gestionar en Recursos Humanos',
+  [PERMISOS.SOLICITUD_VER_TODAS]: 'Ver todas las solicitudes',
+  [PERMISOS.USUARIOS_GESTIONAR]: 'Gestionar usuarios',
+  [PERMISOS.ROLES_GESTIONAR]: 'Gestionar roles',
+  [PERMISOS.REPORTES_VER]: 'Ver reportes',
+});
+
+/**
+ * Permisos de fábrica de cada rol.
+ * ⚠️ IMPORTANTE: lo que cada rol puede hacer lo definen el flujo (TRANSICIONES) y
+ * firestore.rules, así que estos permisos no se editan desde la app: la gestión de
+ * roles los muestra en solo lectura y los usa para recrear un rol que falte.
+ * 🔒 SEGURIDAD: firestore.rules tiene una copia (permisosPorRol) y solo acepta
+ * crear un rol con exactamente estos permisos.
+ */
 export const PERMISOS_POR_ROL = Object.freeze({
   [ROLES.INICIADOR]: [PERMISOS.SOLICITUD_CREAR],
   [ROLES.SUPERVISOR]: [
@@ -142,6 +181,38 @@ export const PERMISOS_POR_ROL = Object.freeze({
     PERMISOS.ROLES_GESTIONAR,
     PERMISOS.REPORTES_VER,
   ],
+});
+
+// -------------------------------------------------------------
+// Usuarios (mantenimiento)
+// -------------------------------------------------------------
+
+/**
+ * 🔒 SEGURIDAD: límites de los datos de un usuario; firestore.rules valida los
+ * mismos largos (nombre, email y área).
+ */
+export const LIMITES_USUARIO = Object.freeze({
+  largoMaximoNombre: 100,
+  largoMaximoEmail: 200,
+  largoMaximoArea: 60,
+  largoMinimoContrasena: 8, // Firebase Auth exige 6; pedimos un poco más
+});
+
+/** Filtro por estado del listado de usuarios ("" = todos). */
+export const FILTROS_ESTADO_USUARIO = Object.freeze({
+  ACTIVOS: 'activos',
+  INACTIVOS: 'inactivos',
+});
+
+export const NOMBRES_FILTRO_ESTADO_USUARIO = Object.freeze({
+  [FILTROS_ESTADO_USUARIO.ACTIVOS]: 'Activos',
+  [FILTROS_ESTADO_USUARIO.INACTIVOS]: 'Dados de baja',
+});
+
+/** Operaciones sobre un usuario que pueden quedar bloqueadas (DECISIONES.md #24). */
+export const OPERACIONES_USUARIO = Object.freeze({
+  BAJA: 'baja',
+  CAMBIO_ROL: 'cambioRol',
 });
 
 // -------------------------------------------------------------

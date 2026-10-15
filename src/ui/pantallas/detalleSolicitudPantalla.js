@@ -45,9 +45,9 @@ import {
   TRANSICIONES,
 } from '../../config/constantes.js';
 import { dibujarMarco } from '../componentes/marco.js';
-import { recargarPantalla, RUTA_INICIO } from '../router.js';
+import { RUTA_INICIO } from '../router.js';
 import { escaparHtml } from '../utils/html.js';
-import { mostrarAviso } from '../utils/avisos.js';
+import { ejecutarConEstado } from '../utils/operaciones.js';
 import {
   claseEstado,
   formatearFechaCalendario,
@@ -344,30 +344,6 @@ function htmlHistorial(historial) {
 // -------------------------------------------------------------
 // Comportamiento
 // -------------------------------------------------------------
-
-/**
- * Deshabilita un botón mientras corre una operación y muestra el error si falla.
- * @param {HTMLButtonElement} boton
- * @param {HTMLElement} mensajeError
- * @param {() => Promise<void>} operacion
- * @param {string} textoExito - Aviso que se muestra si sale bien (después se recarga la pantalla).
- */
-async function ejecutarConEstado(boton, mensajeError, operacion, textoExito) {
-  mensajeError.hidden = true;
-  const textoOriginal = boton.textContent;
-  boton.disabled = true;
-  boton.textContent = 'Guardando…';
-  try {
-    await operacion();
-    mostrarAviso(textoExito);
-    recargarPantalla();
-  } catch (error) {
-    mensajeError.textContent = error.message;
-    mensajeError.hidden = false;
-    boton.disabled = false;
-    boton.textContent = textoOriginal;
-  }
-}
 
 /**
  * Oculta un mensaje de error en cuanto el usuario vuelve a editar (BUGS.md · BUG-005).

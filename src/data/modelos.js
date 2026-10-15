@@ -50,18 +50,18 @@
 
 /**
  * Rol del sistema. Colección "roles"; el id del documento es la clave del rol.
+ * Solo existen los 4 de ROLES; el admin edita nombre y descripción, y puede
+ * volver a crear uno que falte (DECISIONES.md #25).
  * @typedef {Object} Rol
  * @property {string} id - Clave del rol (ej: "supervisor").
- * @property {string} nombre - Nombre para mostrar.
- * @property {string} descripcion - Qué hace este rol en el flujo.
- * @property {string[]} permisos - Capacidades del rol (ver PERMISOS).
- * @property {boolean} activo
+ * @property {string} nombre - Nombre para mostrar (editable).
+ * @property {string} descripcion - Qué hace este rol en el flujo (editable).
+ * @property {string[]} permisos - Capacidades del rol (PERMISOS_POR_ROL); no se editan.
  * @example
  * {
  *   "nombre": "Supervisor",
  *   "descripcion": "Aprueba, devuelve o rechaza las solicitudes de su equipo",
- *   "permisos": ["solicitud.aprobar", "solicitud.devolver", "solicitud.rechazar"],
- *   "activo": true
+ *   "permisos": ["solicitud.aprobar", "solicitud.devolver", "solicitud.rechazar"]
  * }
  */
 

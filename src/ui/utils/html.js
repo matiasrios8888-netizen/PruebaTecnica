@@ -28,3 +28,23 @@ export function escaparHtml(valor) {
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
 }
+
+/**
+ * Opciones de un <select> a partir de un objeto { clave: nombre }, marcando la elegida.
+ * @param {Record<string, string>} nombres - Ej: NOMBRES_ESTADO.
+ * @param {string} elegida - Clave seleccionada ("" = ninguna).
+ * @param {string} [textoTodos] - Si se indica, agrega primero una opción vacía con ese texto (ej: "Todos").
+ * @returns {string} HTML de las <option>.
+ */
+export function htmlOpciones(nombres, elegida, textoTodos) {
+  const primera = textoTodos ? `<option value="">${escaparHtml(textoTodos)}</option>` : '';
+  return (
+    primera +
+    Object.entries(nombres)
+      .map(
+        ([clave, nombre]) =>
+          `<option value="${escaparHtml(clave)}" ${clave === elegida ? 'selected' : ''}>${escaparHtml(nombre)}</option>`,
+      )
+      .join('')
+  );
+}

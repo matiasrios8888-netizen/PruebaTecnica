@@ -649,6 +649,197 @@ Construimos el flujo completo Solicitar → Aprobar → Gestionar RH de punta a 
 
 Construimos la bandeja de tareas: pestañas Pendientes, Nuevas y Enviadas (y Todas para RH y admin) con contadores, búsqueda sin tildes ni mayúsculas, filtros por estado, etapa, tipo y rango de fechas, y orden. Cada pestaña es una consulta a Firestore con su índice compuesto, y filtrar y buscar ocurre en el navegador con lógica pura y testeada. El control de campos por rol pasó a ser una matriz de configuración que decide, campo por campo, quién edita y quién ve según el rol y el estado. La sumamos con los datos de gestión RH, que solo carga el RH asignado al completar, y las reglas de Firestore exigen lo mismo. Durante la fase detectamos dos bugs en código ya publicado (el seed cerraba sesiones y desbordes de diseño). Los corregimos cada uno en su propia rama desde `main`, con tests de regresión, y los integramos a la fase resolviendo los conflictos de merge. Terminamos con 106 tests automáticos en verde y 0 bugs abiertos.
 
+---
+
+## 2026-10-15 – Fase 4 – Paso: reglas de negocio, reglas de Firestore y datos para el mantenimiento
+
+- **Qué hicimos:**
+  - Definimos las reglas del mantenimiento antes de dibujar pantallas. Son las decisiones 24 y 25.
+  - **Baja y cambio de rol bloqueados** mientras el usuario:
+    - sea el admin que opera;
+    - participe en trámites abiertos;
+    - sea supervisor de colaboradores activos;
+    - sea el último RH activo.
+  - **Roles:** son los 4 del sistema. El admin edita el nombre y la descripción, los permisos son de solo lectura, y "crear rol" solo vuelve a crear uno de los 4 si falta.
+  - Toda la lógica quedó en módulos puros con tests. Las reglas de Firestore suman lo que el servidor sí puede garantizar.
+  - Los datos de prueba suman 2 usuarios para probar el mantenimiento.
+- **Archivos creados o modificados:**
+  - `src/config/constantes.js`: `LIMITES_USUARIO`, `LIMITES_ROL`, `NOMBRES_PERMISO`, `DESCRIPCIONES_ROL` (antes estaba en `datosPrueba.mjs`), filtros del listado y `OPERACIONES_USUARIO`.
+  - `src/services/gestionUsuarios.js` (nuevo, puro): valida los datos de un usuario, calcula los motivos de bloqueo, valida la reactivación y filtra el listado.
+  - `src/services/gestionRoles.js` (nuevo, puro): arma el catálogo de los 4 roles, detecta los faltantes, valida nombre y descripción y prepara la creación de un rol faltante.
+  - `firestore.rules`:
+    - **usuarios:** el área es obligatoria; el supervisor tiene que ser coherente (solo el iniciador tiene, existe, es supervisor y está activo, y no es él mismo); un usuario nuevo empieza activo; el admin no puede darse de baja ni cambiarse el rol.
+    - **roles:** solo las 4 claves del sistema; los permisos no se editan; solo se crea un rol con sus permisos de fábrica.
+  - `scripts/tests/gestionUsuarios.test.mjs` (21 tests) y `gestionRoles.test.mjs` (7) (nuevos); `reglas.test.mjs`: +17 tests de usuarios y roles.
+  - `scripts/datosPrueba.mjs` y `seed.mjs`: Sofía Díaz (supervisora sin equipo activo) y Pedro Ruiz (iniciador dado de baja); los roles se escriben sin `activo`.
+  - `src/data/modelos.js` y `docs/MODELO_DATOS.md`: el modelo de `Rol` sin `activo` y la regla del supervisor.
+  - `DECISIONES.md`: decisiones 24 y 25.
+- **Conceptos aprendidos:**
+  - **Lo que las reglas pueden y no pueden validar:** las reglas ven un documento por vez, y pueden leer otros con `get()` o `exists()`, pero no pueden contar ni consultar colecciones. Por eso "¿tiene trámites abiertos?" lo decide el servicio, y "¿su supervisor está activo?" lo deciden las dos capas.
+  - **Operador ternario en las reglas:** `d.rol == 'iniciador' ? (condiciones del iniciador) : d.supervisorId == null` aplica una condición distinta según el rol.
+  - **Tests que vigilan una copia:** los tests de reglas importan `PERMISOS_POR_ROL` desde `constantes.js`. Si la copia que está en `firestore.rules` se desincroniza, fallan.
+- **Comandos usados:**
+  - `git switch -c feature/mantenimiento`: rama de la fase.
+  - `npm run test:unitarios`: 82 tests, 28 nuevos.
+  - `npm run test:reglas`: 69 tests, 17 nuevos.
+  - `npm run seed:simular`, después `firebase deploy --only firestore:rules` y `npm run seed`: se publicaron las reglas y se recargaron los datos (6 usuarios, roles sin `activo`).
+- **Cómo probarlo:** desde `scripts/`, correr `npm test`. Para comprobar que la baja lógica funciona, entrar con `pedro.ruiz@bprosys.test` / `Bprosys2026!`: tiene que aparecer "Tu usuario está dado de baja".
+- **Pendientes o dudas:** las pantallas de usuarios y roles se hacen en los pasos siguientes.
+
+## 2026-10-15 – Fase 4 – Paso: listado de usuarios para el administrador
+
+- **Qué hicimos:**
+  - El admin tiene un nuevo enlace "Usuarios" en el menú, con el listado de todos los colaboradores: nombre, email, rol, área, supervisor y estado.
+  - Se puede buscar por nombre, email o área, sin importar tildes ni mayúsculas, y filtrar por rol y por estado (activos o dados de baja).
+  - Los datos se leen una vez y los filtros solo redibujan la tabla.
+  - Antes de la pantalla hicimos un refactor chico: `usuarioRequerido` y `errorParaUsuario` (la protección del BUG-004) pasaron de `solicitudesServicio.js` a `authServicio.js` para reutilizarlos. `usuarioRequerido` ahora además puede exigir un rol.
+- **Archivos creados o modificados:**
+  - `src/services/authServicio.js`: exporta `usuarioRequerido(roles)` y `errorParaUsuario`.
+  - `src/services/solicitudesServicio.js`: usa las utilidades de `authServicio.js` en lugar de sus copias locales.
+  - `src/services/usuariosServicio.js` (nuevo): casos de uso del mantenimiento; por ahora `cargarUsuarios`, solo para el admin.
+  - `src/data/usuariosRepositorio.js`: `listarUsuarios()`, ordenado por nombre.
+  - `src/ui/pantallas/usuariosPantalla.js` (nuevo): el listado con búsqueda y filtros.
+  - `src/ui/componentes/marco.js`: enlaces del menú por rol ("Nueva solicitud" para el iniciador, "Usuarios" para el admin). La sección actual se marca también en sus subrutas.
+  - `src/ui/router.js`: rutas del mantenimiento (`#/usuarios`, `#/usuarios/nuevo`, `#/usuarios/:id`, `#/roles`).
+  - `src/main.js`: registra `#/usuarios`, restringida al rol admin.
+  - `src/ui/utils/html.js`: `htmlOpciones()`, que antes era una función local de la bandeja, para reutilizarla en los formularios.
+  - `src/ui/pantallas/bandejaPantalla.js`: usa `htmlOpciones()`.
+- **Conceptos aprendidos:**
+  - **Refactor:** cambiar la estructura del código sin cambiar lo que hace. Acá movimos dos funciones a un lugar compartido para no copiarlas en cada servicio nuevo. Se verifica que todo siga igual: la bandeja carga como antes.
+  - **Defensa en capas:** el mantenimiento se protege en cuatro lugares:
+    1. el menú no muestra el enlace;
+    2. el router redirige a otro rol;
+    3. el servicio exige el rol admin;
+    4. firestore.rules solo deja escribir al admin.
+
+    Solo la última es seguridad real. Las otras evitan pantallas y llamadas inútiles.
+- **Comandos usados:**
+  - Un servidor local temporal sin caché y una prueba en el navegador:
+    - Carlos no ve "Usuarios", y `#/usuarios` lo lleva a la bandeja.
+    - Martín ve los 6 usuarios ("5 activos"): "GOMEZ" encuentra a Ana, el filtro Supervisor muestra a Carlos y Sofía, y Dados de baja muestra a Pedro.
+    - "Limpiar filtros" vuelve a los 6.
+    - Sin scroll horizontal en 390 y 320 px, y sin errores en la consola.
+- **Cómo probarlo:** entrar con `admin@bprosys.test` / `Bprosys2026!` → menú "Usuarios" → probar la búsqueda y los filtros. Entrar con otro rol: el enlace no aparece y la ruta `#/usuarios` redirige a la bandeja.
+- **Pendientes o dudas:** el alta, la ficha y los roles se hacen en los pasos siguientes. Hasta entonces, el enlace de cada fila lleva a una ruta que todavía no existe, que vuelve a la bandeja.
+
+## 2026-10-15 – Fase 4 – Paso: alta de usuarios sin cerrar la sesión del admin
+
+- **Qué hicimos:**
+  - El admin da de alta usuarios desde "Usuarios → Nuevo usuario": nombre, email, rol, área, supervisor (solo para el iniciador) y contraseña inicial.
+  - La cuenta de acceso se crea en una **segunda instancia de Firebase**, así la sesión del admin no cambia. Después el admin, con su sesión, guarda el perfil.
+  - Si el alta se corta entre los dos pasos, reintentarla con el mismo email y la misma contraseña la completa (decisión 26).
+- **Archivos creados o modificados:**
+  - `src/config/firebase.js`:
+    - `obtenerAuthAltas()`: la instancia secundaria, con `inMemoryPersistence`, que se crea recién cuando se usa;
+    - reexporta `createUserWithEmailAndPassword`, `sendPasswordResetEmail` y `setDoc`.
+  - `src/data/authAdminRepositorio.js` (nuevo): crea una cuenta, comprueba una cuenta existente y envía el mail de contraseña. Siempre cierra la sesión de la instancia secundaria (`finally`).
+  - `src/data/usuariosRepositorio.js`: `crearPerfil()` y `actualizarPerfil()`.
+  - `src/services/usuariosServicio.js`: `prepararAlta()` y `crearUsuario()`. Valida, crea o completa la cuenta y guarda el perfil, con mensajes en español para los errores de Auth.
+  - `src/ui/componentes/formularioUsuario.js` (nuevo): los campos del usuario, que el alta comparte con la ficha. El supervisor solo aparece si el rol es iniciador.
+  - `src/ui/pantallas/altaUsuarioPantalla.js` (nuevo) y el botón "Nuevo usuario" en el listado.
+  - `src/main.js`: ruta `#/usuarios/nuevo`, solo para el admin.
+  - `src/styles/main.css`: regla global `[hidden] { display: none !important; }`.
+  - `.gitignore`: `scripts/tmp-*` (scripts temporales de prueba que usan la clave de servicio).
+  - `DECISIONES.md` (26 nueva y 14 marcada como implementada) y `BUGS.md` (OBS-001 ampliada).
+- **Conceptos aprendidos:**
+  - **Instancias de Firebase:** `initializeApp(config, 'altaUsuarios')` crea una app independiente con su propia sesión de Auth. Crear una cuenta loguea a esa cuenta solo en esa instancia, y el admin sigue logueado en la principal.
+  - **`try/finally`:** el `finally` se ejecuta tanto si la operación sale bien como si falla. Lo usamos para cerrar siempre la sesión de la instancia secundaria.
+  - **El atributo `hidden` y el CSS:** `hidden` equivale a `display: none`, pero cualquier regla de CSS con `display` (por ejemplo, `.campo { display: grid }`) le gana. La regla global `[hidden] { display: none !important; }` lo asegura.
+  - **Operaciones que no pueden ser atómicas:** crear la cuenta en Auth y guardar el perfil en Firestore son dos sistemas distintos, y no hay una transacción que los abarque. Por eso se diseñó cómo recuperarse si el segundo paso falla.
+- **Comandos usados:**
+  - Prueba en el navegador:
+    - **Formulario:** el supervisor está oculto hasta elegir "Iniciador" y lista solo supervisores activos (Carlos y Sofía). El error se oculta al escribir.
+    - **Validaciones:** campos vacíos → "Ingresá el nombre y apellido."; email repetido en mayúsculas → "Ya existe un usuario con ese email."; contraseña de 5 caracteres → error; sin supervisor → error.
+    - **Alta de Lucía Torres:** aparece en el listado (7 usuarios), el encabezado sigue diciendo "Martín Sosa · Administrador" también después de recargar, y Lucía entra con su contraseña inicial como iniciadora.
+  - `node tmp-prueba-fase4.mjs crear-cuenta-sin-perfil` (script temporal, ignorado por git) para simular un alta interrumpida:
+    - esa cuenta no puede entrar ("no tiene un perfil asignado");
+    - reintentar el alta con otra contraseña → "Ya existe una cuenta de acceso con ese email.";
+    - con la misma contraseña → se completa y el admin sigue logueado.
+- **Cómo probarlo:** con `admin@bprosys.test`, ir a Usuarios → Nuevo usuario y dar de alta a alguien (por ejemplo, rol Iniciador, supervisor Carlos Pérez). Después cerrar sesión y entrar con el email y la contraseña inicial de la persona nueva.
+- **Pendientes o dudas:** por ahora, después del alta se vuelve al listado; en el paso siguiente va a abrir la ficha. Los usuarios creados en las pruebas se borran al cerrar la fase con el script temporal.
+
+## 2026-10-15 – Fase 4 – Paso: ficha del usuario (edición, baja, reactivación y contraseña)
+
+- **Qué hicimos:** cada fila del listado abre la ficha del usuario. Desde ahí el admin puede:
+  - **Editar** nombre, rol, área y supervisor. El email no se edita.
+  - **Dar de baja**, con confirmación. Si está bloqueada, la ficha muestra los motivos y deshabilita el botón.
+  - **Reactivar.** Un iniciador solo se reactiva si su supervisor está activo.
+  - **Enviar el mail** para que el usuario elija una contraseña nueva.
+  - **Ver sus trámites abiertos** (con enlace a cada uno) y, si es supervisor, sus colaboradores.
+
+  Al elegir otro rol, la ficha avisa al instante si el cambio está bloqueado. El servicio vuelve a decidirlo al guardar, con datos leídos en ese momento.
+- **Archivos creados o modificados:**
+  - `src/ui/pantallas/fichaUsuarioPantalla.js` (nuevo) y la ruta `#/usuarios/:id` en `src/main.js`. Después del alta se abre la ficha.
+  - `src/services/usuariosServicio.js`: `obtenerFichaUsuario`, `actualizarUsuario` (con el control del cambio de rol), `darDeBaja`, `reactivar` y `enviarCambioDeContrasena`.
+  - `src/data/solicitudesRepositorio.js`: `listarParticipacionesDe(uid)`. Trae todas las solicitudes donde el usuario participa, sin tope, para detectar trámites abiertos.
+  - `src/services/authServicio.js`: `actualizarUsuarioActual()`, para que el encabezado muestre el nombre nuevo cuando el admin se edita a sí mismo.
+  - `src/ui/utils/operaciones.js` (nuevo): `ejecutarConEstado()`, que se mudó desde el detalle de solicitudes para compartirlo con la ficha.
+  - `src/ui/pantallas/detalleSolicitudPantalla.js`: usa la utilidad compartida.
+  - Mensajes neutros en cuanto a género ("Se dio de baja a…", "(de baja)") en `gestionUsuarios.js`, el servicio y las pantallas.
+  - `src/styles/main.css`: lista de motivos de bloqueo.
+- **Conceptos aprendidos:**
+  - **Validar en el cliente y volver a validar en el servidor:** el aviso de la ficha usa los datos de cuando se abrió. Si en ese tiempo alguien creó un trámite, el servicio lo detecta al guardar porque lee todo de nuevo.
+  - **Clausura** (*closure*): `motivosCambioDeRol(rolNuevo)` es una función que el servicio devuelve "recordando" los usuarios y trámites que cargó. La pantalla la llama cada vez que cambia el rol, sin volver a consultar Firestore.
+  - **Pruebas de regresión:** cuando se mueve código compartido, se vuelve a probar la pantalla que lo usaba. Acá, agregar una nota en el detalle.
+- **Comandos usados:** prueba en el navegador con Martín:
+  - **Bloqueos:** Carlos está bloqueado por 7 trámites abiertos y 2 colaboradores; si se le elige otro rol, aparece el aviso y "Guardar" se deshabilita. Laura está bloqueada por 3 trámites y por ser la única RH. Martín no puede darse de baja ni cambiarse el rol. Ana está bloqueada por sus trámites. Sofía no tiene bloqueos.
+  - **Baja y reactivación:**
+    - Se reactiva a Sofía, se le asigna a Pedro (que está de baja) y se da de baja a Sofía.
+    - Reactivar a Pedro queda bloqueado: "el usuario de su supervisor (Sofía Díaz) está dado de baja".
+    - Con Carlos como supervisor, Pedro se reactiva. Siendo un usuario activo, el selector ya no ofrece supervisores de baja.
+  - **Lucía (RH):**
+    - Con dos RH activas, Laura deja de ser "la única RH".
+    - El mail de contraseña se envía.
+    - Al dar de baja a Lucía, el motivo de Laura vuelve.
+  - **Martín cambia su nombre** y el encabezado se actualiza al instante; después se restaura.
+  - **Sofía de baja** no puede iniciar sesión.
+  - **Regresión del detalle:** Ana agrega una nota (el historial pasa de 1 a 2 eventos). Sin scroll horizontal en 390 y 320 px. `npm run test:unitarios`: 82 en verde.
+- **Cómo probarlo:**
+  1. Con `admin@bprosys.test`, abrir Usuarios → Carlos Pérez: los motivos del bloqueo y el aviso al cambiar el rol.
+  2. Abrir Sofía Díaz → Dar de baja.
+  3. Entrar como `sofia.diaz@bprosys.test`: aparece "Tu usuario está dado de baja".
+  4. Volver como admin y reactivarla.
+- **Pendientes o dudas:**
+  - **Hallazgo de las pruebas, no de la app:** cuando el MCP de Playwright intercepta un `confirm()`, devuelve el control pero el script sigue ejecutándose. Eso mezcló dos pruebas. Desde entonces, en las pruebas automáticas se reemplaza `window.confirm`.
+  - Los cambios que hicieron las pruebas en los datos se revierten al cerrar la fase con `npm run seed` y el script temporal.
+
+## 2026-10-15 – Fase 4 – Paso: gestión de roles
+
+- **Qué hicimos:**
+  - Nueva pantalla "Roles" para el admin, con una tarjeta por cada uno de los 4 roles del sistema: descripción, permisos (solo lectura) y cantidad de usuarios activos y dados de baja.
+  - **Edición:** "Editar" cambia el nombre visible y la descripción. El nombre nuevo se ve en toda la app: menú, listados, filtros, historial y encabezado de cada usuario.
+  - **Rol perdido:** si falta el documento de uno de los 4 roles, la tarjeta lo marca como "Falta en el catálogo" y aparece el formulario **"Crear rol"**, que solo ofrece los roles faltantes y los crea con sus permisos de fábrica.
+  - **Sin roles faltantes:** la sección explica por qué no se pueden crear roles nuevos.
+  - **Si se pierde el documento de un rol, los usuarios con ese rol siguen trabajando.**
+- **Archivos creados o modificados:**
+  - `src/data/rolesRepositorio.js` (nuevo): `listarRoles`, `crearRol` y `actualizarRol`.
+  - `src/services/catalogoRoles.js` (nuevo): los nombres de los roles en memoria. Se cargan una vez al iniciar sesión y, si algo falla, se usa el nombre de fábrica.
+  - `src/services/rolesServicio.js` (nuevo): `obtenerGestionRoles`, `guardarRol` y `crearRolFaltante`, solo para el admin.
+  - `src/services/authServicio.js`: carga el catálogo al validar el perfil y lo limpia al cerrar sesión.
+  - `src/ui/utils/formato.js`: `nombreRol()` usa el catálogo.
+  - `src/ui/pantallas/rolesPantalla.js` (nuevo), el enlace "Roles" en el menú del admin y la ruta `#/roles` en `src/main.js`.
+  - `src/styles/main.css`: grilla de tarjetas de roles (2 columnas en pantallas anchas, 1 en celulares) y lista de permisos.
+  - `DECISIONES.md`: la 25 explica cómo se cargan los nombres.
+- **Conceptos aprendidos:**
+  - **Caché en memoria con valor por defecto:** el catálogo guarda los nombres en una variable del módulo. Si no hay dato, `nombreDeRol()` devuelve el nombre de fábrica, así la pantalla nunca muestra un rol vacío.
+  - **Evitar lecturas duplicadas:** al iniciar sesión, el login y el observador de sesión piden el catálogo casi a la vez. `cargaEnCurso` guarda la promesa y el segundo pedido reutiliza la misma lectura.
+  - **Diseño a prueba de datos perdidos:** el rol de cada usuario se valida contra la lista fija `ROLES` del código, no contra la colección. Por eso borrar un documento de `roles` no deja a nadie afuera.
+- **Comandos usados:**
+  - **Prueba en el navegador:**
+    - Las 4 tarjetas muestran sus permisos y conteos.
+    - Un nombre vacío da "Ingresá el nombre del rol.".
+    - RH pasa a "RRHH" y se ve en el listado de usuarios, en el filtro de rol y en el encabezado de Laura.
+    - Laura no ve "Roles", y `#/roles` la lleva a la bandeja.
+  - `node tmp-prueba-fase4.mjs borrar-rol rh` (script temporal):
+    - Laura entra igual y ve sus 3 solicitudes.
+    - El admin ve "Falta en el catálogo", el formulario "Crear rol" ofrece solo `rh` con sus permisos de fábrica, y al crearlo la tarjeta vuelve.
+  - Sin scroll horizontal en 390 y 320 px, y sin errores en la consola. Captura revisada; se agregó espacio entre la descripción y los permisos.
+- **Cómo probarlo:**
+  1. Con `admin@bprosys.test`, ir a "Roles" → Editar "Recursos Humanos" → cambiarle el nombre.
+  2. Entrar como `rh@bprosys.test` y ver el nombre nuevo en el encabezado.
+  3. Para ver el caso del rol perdido: borrar el documento `roles/rh` desde la consola de Firebase, recargar "Roles" y crearlo de nuevo.
+- **Pendientes o dudas:** queda la prueba integral, la documentación y el cierre de la fase.
+
 ## 2026-10-15 – Fase 4 – Corrección: BUG-008 (avisos que quedaban después de cerrar sesión)
 
 - **Qué hicimos:** en la prueba integral de la Fase 4 apareció un aviso de la sesión anterior ("SOL-0011: Completar gestión ✔") en la sesión del admin. El código de los avisos es de la Fase 2, que ya está en `main`, así que seguimos el flujo de BUGS.md:
@@ -693,3 +884,46 @@ Construimos la bandeja de tareas: pestañas Pendientes, Nuevas y Enviadas (y Tod
   - `git switch -c fix/quitar-script-temporal`, `git rm --cached scripts/tmp-prueba-fase4.mjs`, commit, `git merge --no-ff` a `main` y `git push`.
 - **Cómo probarlo:** `git ls-files scripts` ya no lista el script, y `git check-ignore -v scripts/tmp-prueba-fase4.mjs` muestra la regla que lo ignora.
 - **Pendientes o dudas:** ninguno.
+
+## 2026-10-15 – Fase 4 – Paso: integración de correcciones, prueba integral y cierre
+
+- **Qué hicimos:**
+  - Trajimos a `feature/mantenimiento` las correcciones de `main` (BUG-008 y OBS-005) y resolvimos 2 conflictos de merge, conservando las dos versiones.
+  - Hicimos una prueba integral del mantenimiento junto con el flujo de solicitudes, actualizamos el README y cerramos la fase.
+- **Archivos creados o modificados:**
+  - `src/main.js` y `BITACORA.md`: conflictos resueltos.
+    - En `main.js`, las importaciones de las pantallas nuevas más `limpiarAvisos`.
+    - En la bitácora, las entradas de la fase seguidas de las dos correcciones.
+  - `README.md`: Fase 4 ✅, qué puede hacer el admin, la estructura nueva y los usuarios de prueba Sofía y Pedro.
+- **Conceptos aprendidos:**
+  - **Prueba integral:** además de probar cada pantalla por separado, se prueba un caso de punta a punta que cruza módulos. Acá, que los bloqueos del mantenimiento sigan el ciclo de vida real de un trámite.
+  - **Sincronizar bien una prueba automática:** dos veces una prueba "falló" porque esperaba un elemento que también existía en otra pantalla. Pasó con un `<tr>` que contenía el nombre del supervisor y con el campo `email` de la ficha. La solución es esperar algo que identifique sin ambigüedad a la pantalla esperada.
+- **Comandos usados:**
+  - `git merge main` (en la rama de la fase), resolución de conflictos y `git commit --no-edit`.
+  - `npm test`: 82 unitarios y 69 de reglas, en verde.
+  - Prueba integral en el navegador:
+    1. Martín da de alta a Lucía Torres (iniciadora, supervisora Sofía) y se abre su ficha.
+    2. Lucía pide un permiso (`SOL-0011`) y Sofía lo aprueba.
+    3. Mientras está abierto, Lucía no se puede dar de baja (participa en `SOL-0011`), y Sofía tampoco (por `SOL-0011` y por tener a Lucía a cargo).
+    4. Laura lo completa (`LIQ-2026-1102`). Lucía queda libre y se la da de baja; entonces Sofía también se puede dar de baja.
+    5. Al salir con un aviso a la vista, el login queda sin avisos (BUG-008 integrado).
+  - Limpieza: con un script temporal ignorado por git, se borraron los 3 usuarios de prueba que quedaban (el de "alta interrumpida" ya se había borrado). Después, `npm run seed` (6 usuarios, 10 solicitudes, contador en 10) y se borró el script.
+  - `git merge --no-ff feature/mantenimiento` (en `main`) y `git push`.
+- **Cómo probarlo:** Live Server (Ctrl + F5) y repetir el recorrido de arriba con los usuarios de prueba.
+- **Pendientes o dudas:**
+  - `BUGS.md` tiene 0 bugs abiertos.
+  - Quedan como mejoras:
+    - obligar a cambiar la contraseña inicial en el primer ingreso;
+    - paginar la bandeja (más de 200 solicitudes por lista).
+
+---
+
+## Resumen de la Fase 4
+
+Construimos el mantenimiento de usuarios y roles para el administrador:
+- **Usuarios:** listado con búsqueda, alta, edición, baja lógica, reactivación y mail para cambiar la contraseña.
+- **Alta sin perder la sesión:** la cuenta se crea en una segunda instancia de Firebase, así el admin sigue logueado, y si el alta se corta a mitad de camino se puede completar reintentándola.
+- **Bloqueos:** la baja y el cambio de rol se bloquean mientras el usuario tenga trámites abiertos, colaboradores a cargo o sea el último RH, para que ningún trámite quede trabado. La pantalla muestra los motivos y el servicio los vuelve a verificar al guardar.
+- **Roles:** son los 4 que conoce el flujo. El admin edita su nombre y descripción y puede volver a crear uno que se pierda, siempre con sus permisos de fábrica.
+- **Calidad:** la lógica es pura y testeada, y las reglas de Firestore suman lo que el servidor puede garantizar. Terminamos con 151 tests en verde.
+- **Proceso:** encontramos y corregimos un bug en código ya publicado (BUG-008) y un error de proceso (OBS-005) con el flujo de ramas `fix/`, sin tocar `main` directamente.

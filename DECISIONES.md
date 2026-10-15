@@ -95,7 +95,7 @@ Registro de las decisiones importantes del proyecto: qué decidimos, qué altern
 - **Alternativas:** borrar la cuenta de Auth y el perfil.
 - **Por qué:** desde el navegador no se pueden borrar cuentas de otros usuarios en Auth (requiere Admin SDK). Además, borrar dejaría trámites e historial apuntando a alguien inexistente.
 
-## 14. Alta de usuarios desde la app con una segunda instancia de Firebase App (se implementa en la Fase 4)
+## 14. Alta de usuarios desde la app con una segunda instancia de Firebase App (implementada en la Fase 4)
 
 - **Problema:** con el SDK de cliente, `createUserWithEmailAndPassword` deja logueado al usuario recién creado y saca al admin de su sesión. Cloud Functions y el Admin SDK lo resolverían del lado del servidor, pero requieren el plan Blaze.
 - **Decisión:** crear una segunda instancia de Firebase App, solo para dar de alta usuarios:
@@ -187,3 +187,53 @@ Registro de las decisiones importantes del proyecto: qué decidimos, qué altern
 - **Alternativas:** `if (rol === ...)` repartidos en las pantallas; formularios distintos por rol.
 - **Por qué:** es una sola fuente de verdad, fácil de leer y de extender (sumar un campo o cambiar quién lo edita no toca la pantalla), y se testea como una función pura. Las reglas de Firestore replican la parte de **edición**.
 - **Límite conocido:** Firestore controla la lectura por documento, no por campo. Un usuario que puede leer una solicitud técnicamente puede ver todos sus campos aunque la pantalla los oculte. Por eso estos campos no guardan datos sensibles. Si los hubiera, irían en un documento aparte con su propia regla de lectura.
+
+## 24. Baja y cambio de rol bloqueados mientras el usuario tenga trámites en curso
+
+- **Decisión:** no se puede dar de baja a un usuario ni cambiarle el rol mientras:
+  1. sea el propio admin que opera (las reglas también lo impiden, y así siempre queda un admin activo);
+  2. participe en trámites abiertos, como asignado, solicitante o supervisor;
+  3. sea supervisor de colaboradores activos;
+  4. sea el último RH activo.
+
+  La pantalla muestra los motivos, con los números de los trámites. Para reactivar a un iniciador, su supervisor tiene que estar activo.
+- **Alternativas:**
+  - Reasignar automáticamente los trámites del usuario que se va.
+  - Permitir la baja y dejar los trámites como están.
+- **Por qué:**
+  - El flujo asigna cada tarea a una persona concreta y la devuelve a quien corresponde: una devuelta vuelve al solicitante y, al reenviarla, a su supervisor original. Si esa persona ya no está activa o no tiene el rol, el trámite queda trabado sin que nadie pueda moverlo.
+  - Reasignar a ciegas cambiaría quién aprueba algo sin que nadie lo decida, y dejaría huecos en la trazabilidad.
+  - Bloquear con un mensaje claro le deja la decisión al admin.
+- **Límite conocido:** las reglas de Firestore no pueden contar documentos, así que los bloqueos 2 a 4 los controla el servicio, con datos leídos en el momento de guardar. Las reglas sí garantizan que solo el admin escribe en `usuarios`, que no se modifique a sí mismo y que el supervisor de un iniciador activo exista, sea supervisor y esté activo.
+
+## 25. Roles: los 4 del sistema, con nombre y descripción editables
+
+- **Decisión:**
+  - El catálogo `roles` tiene solo los 4 roles que conoce el flujo.
+  - El admin edita su nombre visible, que se usa en toda la app, y su descripción.
+  - Los nombres se cargan en memoria al iniciar sesión (`catalogoRoles.js`). Si falta un rol o falla la lectura, se usa el nombre de fábrica (`NOMBRES_ROL`).
+  - Los permisos se muestran en solo lectura.
+  - "Crear rol" existe solo para volver a crear uno de los 4 si falta su documento, por ejemplo si alguien lo borró desde la consola. Se crea con sus permisos de fábrica, y las reglas no aceptan otra clave ni otros permisos.
+  - Se quitó el campo `activo` de los roles, porque un rol del sistema no se puede desactivar sin romper el flujo.
+- **Alternativas:**
+  - Roles libres con permisos configurables (RBAC dinámico).
+  - Un catálogo de solo lectura.
+- **Por qué:**
+  - Lo que puede hacer cada rol lo deciden `TRANSICIONES` y `firestore.rules`.
+  - Un rol nuevo, o un permiso editado en la base, no cambiaría nada de eso: daría una falsa sensación de configuración, o habría que leer permisos de la base dentro de las reglas, con más lecturas por petición y más superficie de error.
+  - Que el rol de cada usuario se valide contra la lista fija `ROLES` hace que perder un documento del catálogo no deje a nadie sin acceso.
+
+## 26. Alta de usuarios: contraseña inicial y alta interrumpida
+
+- **Decisión:**
+  - El admin carga una **contraseña inicial** (mínimo 8 caracteres) y se la comunica al usuario. Si el usuario la olvida, desde su ficha se le envía el mail de Firebase para elegir otra (`sendPasswordResetEmail`).
+  - El alta tiene dos pasos que no pueden ir juntos en una misma operación: la cuenta en Auth y el perfil en Firestore. Si el segundo falla, **reintentar el alta con el mismo email y la misma contraseña la completa**: el servicio comprueba la contraseña en la instancia secundaria y escribe el perfil que falta.
+- **Alternativas:**
+  - Invitación por mail, sin contraseña inicial.
+  - Una contraseña aleatoria que el admin no elige.
+  - Borrar la cuenta huérfana, que desde el navegador no se puede.
+- **Por qué:**
+  - Los usuarios de prueba tienen emails ficticios (`@bprosys.test`) a los que no llega ningún mail: con invitación por mail, la demo no se podría probar.
+  - Comprobar la contraseña antes de completar un alta evita que alguien "adopte" una cuenta ajena que tenga ese email.
+  - Una cuenta sin perfil no puede hacer nada (decisión 14), así que el estado intermedio no es un riesgo de seguridad.
+- **Límite:** no se obliga a cambiar la contraseña inicial en el primer ingreso. Haría falta un campo más en el perfil y una pantalla de cambio de contraseña; queda como mejora.

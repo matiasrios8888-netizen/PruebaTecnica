@@ -137,6 +137,8 @@ Todo bug o error detectado queda registrado acá, **aunque se corrija en el mome
 ### OBS-001 · `400` en la consola al ingresar una contraseña incorrecta
 Firebase Auth responde `400` a `accounts:signInWithPassword` cuando las credenciales son inválidas, y el navegador registra toda respuesta 4xx en la consola. Es el comportamiento esperado: la app lo traduce a "Email o contraseña incorrectos." y no se puede silenciar desde JavaScript.
 
+En la Fase 4 aparece lo mismo en el alta de usuarios. `accounts:signUp` responde `400` cuando el email ya tiene cuenta. Si después la contraseña no coincide, `accounts:signInWithPassword` también responde `400`. La app traduce los dos casos a "Ya existe una cuenta de acceso con ese email." o completa el alta interrumpida.
+
 ### OBS-002 · `Listen/channel ERR_ABORTED` al cerrar sesión
 Al cambiar de usuario, el SDK de Firestore cierra y vuelve a abrir su conexión interna (`google.firestore.v1.Firestore/Listen/channel`). El navegador muestra las peticiones cortadas como abortadas. Es interno del SDK y no afecta los datos.
 

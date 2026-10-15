@@ -15,7 +15,7 @@
 
 import { cerrarSesion } from '../../services/authServicio.js';
 import { ROLES } from '../../config/constantes.js';
-import { RUTA_INICIO, RUTA_NUEVA_SOLICITUD } from '../router.js';
+import { RUTA_INICIO, RUTA_NUEVA_SOLICITUD, RUTA_ROLES, RUTA_USUARIOS } from '../router.js';
 import { escaparHtml } from '../utils/html.js';
 import { nombreRol } from '../utils/formato.js';
 
@@ -26,10 +26,19 @@ import { nombreRol } from '../utils/formato.js';
  * @returns {HTMLElement} El <main> de la pantalla.
  */
 export function dibujarMarco(contenedor, usuario) {
-  // ⚠️ IMPORTANTE: el enlace "Nueva solicitud" solo se muestra a quien puede crear.
-  // (Es comodidad: el router y firestore.rules igual lo controlan.)
-  const enlaceNueva =
-    usuario.rol === ROLES.INICIADOR ? `<a href="${RUTA_NUEVA_SOLICITUD}" class="nav__enlace">Nueva solicitud</a>` : '';
+  // ⚠️ IMPORTANTE: cada rol ve solo los enlaces de lo que puede hacer: "Nueva solicitud"
+  // el iniciador y el mantenimiento el admin. (Es comodidad: el router, los servicios
+  // y firestore.rules igual lo controlan.)
+  const enlacesDelRol = {
+    [ROLES.INICIADOR]: [[RUTA_NUEVA_SOLICITUD, 'Nueva solicitud']],
+    [ROLES.ADMIN]: [
+      [RUTA_USUARIOS, 'Usuarios'],
+      [RUTA_ROLES, 'Roles'],
+    ],
+  };
+  const enlacesExtra = (enlacesDelRol[usuario.rol] ?? [])
+    .map(([ruta, texto]) => `<a href="${ruta}" class="nav__enlace">${texto}</a>`)
+    .join('');
 
   contenedor.className = 'app app--privada';
   contenedor.innerHTML = `
@@ -37,7 +46,7 @@ export function dibujarMarco(contenedor, usuario) {
       <a href="${RUTA_INICIO}" class="encabezado__marca">Permisos</a>
       <nav class="nav">
         <a href="${RUTA_INICIO}" class="nav__enlace">Bandeja</a>
-        ${enlaceNueva}
+        ${enlacesExtra}
       </nav>
       <div class="encabezado__usuario">
         <span>${escaparHtml(usuario.nombre)} · <small>${escaparHtml(nombreRol(usuario.rol))}</small></span>
@@ -47,12 +56,12 @@ export function dibujarMarco(contenedor, usuario) {
     <main class="contenido" id="contenido"></main>
   `;
 
-  // Marca el enlace de la sección actual (la bandeja incluye todas sus pestañas).
+  // Marca el enlace de la sección actual, incluidas sus subrutas
+  // (#/bandeja/nuevas es "Bandeja"; #/usuarios/abc es "Usuarios").
   const hash = window.location.hash || RUTA_INICIO;
   for (const enlace of contenedor.querySelectorAll('.nav__enlace')) {
     const destino = enlace.getAttribute('href');
-    const esActual = destino === RUTA_INICIO ? hash.startsWith(RUTA_INICIO) : hash === destino;
-    if (esActual) enlace.setAttribute('aria-current', 'page');
+    if (hash === destino || hash.startsWith(`${destino}/`)) enlace.setAttribute('aria-current', 'page');
   }
   contenedor.querySelector('#botonSalir').addEventListener('click', () => cerrarSesion());
   return contenedor.querySelector('#contenido');
