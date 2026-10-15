@@ -15,7 +15,9 @@
  * Uso (desde la carpeta scripts/):
  *   npm install            → instala firebase-admin (solo la primera vez)
  *   npm run seed:simular   → valida todo y prueba la conexión SIN escribir nada
- *   npm run seed           → carga los datos
+ *   npm run seed           → carga los datos (no toca las contraseñas de usuarios existentes)
+ *   npm run seed:restablecer-claves → además vuelve a poner la contraseña común
+ *                            (cierra las sesiones abiertas de esos usuarios)
  *
  * Depende de: firebase-admin, scripts/datosPrueba.mjs, src/config/constantes.js,
  *   src/services/flujoSolicitud.js (la misma lógica de flujo que usa la app),
@@ -60,6 +62,8 @@ import {
 const PROYECTO_ESPERADO = 'pruebatecnica-2002c';
 const RUTA_CLAVE = new URL('./serviceAccountKey.json', import.meta.url);
 const MODO_SIMULACION = process.argv.includes('--simular');
+/** Vuelve a poner la contraseña común a los usuarios que ya existen (cierra sus sesiones abiertas). */
+const RESTABLECER_CLAVES = process.argv.includes('--restablecer-claves');
 const MS_POR_HORA = 60 * 60 * 1000;
 const MS_POR_DIA = 24 * MS_POR_HORA;
 
@@ -272,21 +276,27 @@ function construirSolicitud(guion, numero, usuarios, ahora) {
 
 /**
  * Crea los usuarios en Firebase Auth, o los actualiza si ya existen (mismo email).
+ *
+ * ⚠️ IMPORTANTE: a un usuario que ya existe NO se le cambia la contraseña, salvo
+ * con --restablecer-claves. Para Firebase, cambiar la contraseña (aunque sea la
+ * misma) invalida todas las sesiones abiertas de ese usuario: recargar los datos
+ * de prueba deslogueaba a cualquiera que estuviera usando la demo (BUGS.md · BUG-006).
+ *
  * @param {import('firebase-admin/auth').Auth} auth
  * @returns {Promise<Record<string, object>>} Usuarios de prueba con su uid, por clave.
  */
 async function prepararUsuariosAuth(auth) {
   const resultado = {};
   for (const [clave, datos] of Object.entries(USUARIOS_PRUEBA)) {
-    const propiedades = { email: datos.email, password: PASSWORD_PRUEBA, displayName: datos.nombre, disabled: false };
+    const basicas = { email: datos.email, displayName: datos.nombre, disabled: false };
     let uid;
     try {
       uid = (await auth.getUserByEmail(datos.email)).uid;
-      await auth.updateUser(uid, propiedades);
-      console.log(`  ↻ Auth: ${datos.email} (ya existía, actualizado)`);
+      await auth.updateUser(uid, RESTABLECER_CLAVES ? { ...basicas, password: PASSWORD_PRUEBA } : basicas);
+      console.log(`  ↻ Auth: ${datos.email} (ya existía, actualizado${RESTABLECER_CLAVES ? ' con contraseña restablecida' : ''})`);
     } catch (error) {
       if (error.code !== 'auth/user-not-found') throw error;
-      uid = (await auth.createUser(propiedades)).uid;
+      uid = (await auth.createUser({ ...basicas, password: PASSWORD_PRUEBA })).uid;
       console.log(`  + Auth: ${datos.email} (creado)`);
     }
     // "id" y "activo" con la forma de Usuario (modelos.js), que espera flujoSolicitud.js.

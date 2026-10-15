@@ -105,7 +105,8 @@ npm install
 | Comando | Qué hace |
 |---|---|
 | `npm run seed:simular` | Valida los datos de prueba y la conexión **sin escribir nada**. |
-| `npm run seed` | Crea o actualiza los 4 usuarios, los roles y 10 solicitudes con historial y adjuntos. Es idempotente. |
+| `npm run seed` | Crea o actualiza los 4 usuarios, los roles y 10 solicitudes con historial y adjuntos. Es idempotente. No cambia la contraseña de los usuarios que ya existen (así no cierra sus sesiones). |
+| `npm run seed:restablecer-claves` | Igual que `seed`, pero además vuelve a poner la contraseña común a los usuarios existentes (cierra sus sesiones abiertas). |
 | `npm test` | Corre todos los tests (lógica del flujo + reglas). |
 | `npm run test:flujo` | Tests unitarios de la lógica pura del flujo (`src/services/flujoSolicitud.js`). No necesita Firebase. |
 | `npm run test:reglas` | Tests de `firestore.rules` contra el emulador de Firestore (no toca la base real). |
