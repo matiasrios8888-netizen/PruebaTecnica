@@ -5,7 +5,7 @@
  *
  * Responsabilidad: mostrar avisos breves ("toast") que sobreviven a un
  *   cambio de pantalla, por ejemplo "Solicitud SOL-0011 creada" al pasar
- *   del formulario al detalle.
+ *   del formulario al detalle, y borrarlos al cerrar sesión.
  *
  * Depende de: nada.
  * =============================================================
@@ -32,4 +32,14 @@ export function mostrarAviso(texto, tipo = 'ok') {
   aviso.textContent = texto;
   zona.append(aviso);
   setTimeout(() => aviso.remove(), DURACION_MS);
+}
+
+/**
+ * Borra los avisos que estén a la vista. Se usa al cerrar sesión: la zona de
+ * avisos vive fuera de las pantallas, así que sin esto un aviso de la sesión
+ * anterior (por ejemplo "SOL-0011: Completar gestión ✔") seguía visible en el
+ * login, y lo veía quien entrara después en la misma computadora (BUGS.md · BUG-008).
+ */
+export function limpiarAvisos() {
+  document.getElementById('zonaAvisos')?.replaceChildren();
 }
