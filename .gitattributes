@@ -1,0 +1,8 @@
+# Normaliza los finales de línea a LF en todos los archivos de texto,
+# sin importar si se trabaja en Windows, macOS o Linux.
+* text=auto eol=lf
+
+# Archivos binarios: git no debe tocarlos.
+*.png binary
+*.jpg binary
+*.pdf binary

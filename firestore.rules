@@ -1,0 +1,415 @@
+// =============================================================
+// Capa: SEGURIDAD (servidor)
+// Archivo: firestore.rules
+//
+// Responsabilidad:
+//   Decidir en los servidores de Google si cada lectura o escritura está
+//   permitida. Es la barrera que no se puede saltear: aunque alguien modifique
+//   el JavaScript en su navegador, Firestore rechaza lo que estas reglas no
+//   permiten (error "permission-denied").
+//
+// Depende de: el modelo de datos (docs/MODELO_DATOS.md). Las reglas no pueden
+//   importar src/config/constantes.js, así que repiten roles, estados, tipos
+//   de permiso, la tabla de transiciones y los límites de adjuntos.
+//   ⚠️ IMPORTANTE: si cambia constantes.js, revisar también este archivo.
+//
+// Principios:
+//   - Todo lo que no está permitido explícitamente está prohibido.
+//   - Las reglas NO son filtros: una consulta solo se acepta si TODOS los
+//     resultados posibles cumplen la regla de lectura. Por eso la app siempre
+//     consulta filtrando por un campo que la regla revisa (asignadoA,
+//     participantes, solicitanteId…).
+//   - firebase-admin (scripts/seed.mjs) NO pasa por estas reglas.
+//
+// Publicar: firebase deploy --only firestore:rules
+// =============================================================
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------
+    // Constantes (copia de src/config/constantes.js)
+    // ---------------------------------------------------------
+
+    function roles() { return ['iniciador', 'supervisor', 'rh', 'admin']; }
+    function estadosFinales() { return ['completada', 'rechazada', 'cancelada']; }
+
+    // Tope de días por tipo de permiso (CONFIG_TIPOS_PERMISO).
+    function diasMaximosPorTipo() {
+      return {
+        'vacaciones': 15,
+        'enfermedad': 30,
+        'personal': 2,
+        'estudio': 5,
+        'duelo': 5,
+        'maternidadPaternidad': 90
+      };
+    }
+
+    // ---------------------------------------------------------
+    // Usuario que hace la petición
+    // ---------------------------------------------------------
+
+    function rutaUsuario(uid) { return /databases/$(database)/documents/usuarios/$(uid); }
+
+    function autenticado() { return request.auth != null; }
+
+    // Perfil del usuario logueado. Cada get() cuenta como una lectura, pero
+    // varias llamadas al mismo documento en una petición se cobran una vez.
+    function perfil() { return get(rutaUsuario(request.auth.uid)).data; }
+
+    // 🔒 SEGURIDAD: tener cuenta en Auth no alcanza. Hace falta perfil y estar activo.
+    // Así la baja lógica (activo = false) corta el acceso aunque la sesión siga abierta.
+    function habilitado() {
+      return autenticado()
+        && exists(rutaUsuario(request.auth.uid))
+        && perfil().activo == true;
+    }
+
+    function tieneRol(rol) { return habilitado() && perfil().rol == rol; }
+
+    function esAdmin() { return tieneRol('admin'); }
+
+    // ---------------------------------------------------------
+    // Utilidades
+    // ---------------------------------------------------------
+
+    // Campos que cambian en una actualización.
+    function camposModificados() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    function esFechaCalendario(valor) {
+      return valor is string && valor.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function textoEntre(valor, minimo, maximo) {
+      return valor is string && valor.size() >= minimo && valor.size() <= maximo;
+    }
+
+    // =========================================================
+    // usuarios/{uid}
+    // =========================================================
+    match /usuarios/{uid} {
+
+      function usuarioValido(d) {
+        return d.keys().hasOnly(['nombre', 'email', 'rol', 'supervisorId', 'area', 'activo',
+                                 'fechaCreacion', 'fechaActualizacion'])
+          && textoEntre(d.nombre, 1, 100)
+          && textoEntre(d.email, 3, 200)
+          && d.rol in roles()
+          && (d.supervisorId == null || d.supervisorId is string)
+          && d.area is string
+          && d.activo is bool
+          && d.fechaActualizacion == request.time;
+      }
+
+      // Cada usuario puede leer SU perfil aunque esté inactivo: así el login
+      // puede mostrar "usuario dado de baja" en vez de un error genérico.
+      allow get: if autenticado() && request.auth.uid == uid;
+
+      // El directorio de usuarios (nombres y roles) lo ve cualquier usuario activo:
+      // se necesita para mostrar nombres, asignar tareas y armar reportes.
+      allow read: if habilitado();
+
+      // 🔒 SEGURIDAD: solo el admin da de alta o edita usuarios (Fase 4).
+      allow create: if esAdmin()
+        && usuarioValido(request.resource.data)
+        && request.resource.data.fechaCreacion == request.time;
+
+      // El email no se edita (tiene que coincidir con la cuenta de Auth)
+      // y la fecha de creación no se reescribe.
+      allow update: if esAdmin()
+        && usuarioValido(request.resource.data)
+        && !camposModificados().hasAny(['email', 'fechaCreacion']);
+
+      // Baja lógica: los usuarios nunca se borran (activo = false).
+      allow delete: if false;
+    }
+
+    // =========================================================
+    // roles/{rolId}
+    // =========================================================
+    match /roles/{rolId} {
+      allow read: if habilitado();
+
+      allow create, update: if esAdmin()
+        && request.resource.data.keys().hasOnly(['nombre', 'descripcion', 'permisos', 'activo'])
+        && textoEntre(request.resource.data.nombre, 1, 60)
+        && request.resource.data.descripcion is string
+        && request.resource.data.permisos is list
+        && request.resource.data.activo is bool;
+
+      allow delete: if false;
+    }
+
+    // =========================================================
+    // solicitudes/{solicitudId}
+    // =========================================================
+    match /solicitudes/{solicitudId} {
+
+      // ---- Lectura -------------------------------------------
+
+      // ⚠️ IMPORTANTE: cada condición corresponde a una consulta de la bandeja:
+      //   asignadoA == yo → "Pendientes"; participantes contiene yo → "Enviadas";
+      //   RH y admin ven todas (reportes y seguimiento).
+      function puedeLeer(s) {
+        return habilitado() && (
+          s.asignadoA == request.auth.uid
+          || s.solicitanteId == request.auth.uid
+          || s.supervisorId == request.auth.uid
+          || request.auth.uid in s.participantes
+          || perfil().rol in ['rh', 'admin']
+        );
+      }
+
+      allow read: if puedeLeer(resource.data);
+
+      // ---- Validaciones comunes --------------------------------
+
+      function camposSolicitud() {
+        return ['numero', 'tipoPermiso', 'fechaInicio', 'fechaFin', 'cantidadDias', 'motivo',
+                'solicitanteId', 'solicitanteNombre', 'supervisorId',
+                'etapaActual', 'estadoActual', 'asignadoA', 'asignadoNombre', 'rolAsignado',
+                'vistaPorAsignado', 'participantes', 'cantidadAdjuntos', 'cantidadNotas',
+                'fechaCreacion', 'fechaActualizacion'];
+      }
+
+      // ⚠️ IMPORTANTE: reglas de negocio de los datos del permiso.
+      function datosPermisoValidos(d) {
+        return d.tipoPermiso in diasMaximosPorTipo()
+          && esFechaCalendario(d.fechaInicio)
+          && esFechaCalendario(d.fechaFin)
+          && d.fechaFin >= d.fechaInicio   // las fechas AAAA-MM-DD se comparan bien como texto
+          && d.cantidadDias is int
+          && d.cantidadDias >= 1
+          && d.cantidadDias <= diasMaximosPorTipo()[d.tipoPermiso]
+          && textoEntre(d.motivo, 1, 1000);
+      }
+
+      // ---- Creación --------------------------------------------
+
+      // ⚠️ IMPORTANTE: solo un iniciador crea solicitudes, siempre a su nombre,
+      // en estado "enAprobacion" y asignadas a SU supervisor (no a quien elija).
+      allow create: if tieneRol('iniciador')
+        && request.resource.data.keys().hasOnly(camposSolicitud())
+        && request.resource.data.keys().hasAll(camposSolicitud())
+        && datosPermisoValidos(request.resource.data)
+        && textoEntre(request.resource.data.numero, 1, 20)
+        && request.resource.data.solicitanteId == request.auth.uid
+        && request.resource.data.solicitanteNombre == perfil().nombre
+        && perfil().supervisorId is string
+        && request.resource.data.supervisorId == perfil().supervisorId
+        && request.resource.data.estadoActual == 'enAprobacion'
+        && request.resource.data.etapaActual == 'aprobacion'
+        && request.resource.data.asignadoA == perfil().supervisorId
+        && request.resource.data.rolAsignado == 'supervisor'
+        && request.resource.data.asignadoNombre is string
+        && request.resource.data.vistaPorAsignado == false
+        && request.resource.data.participantes.toSet() == [request.auth.uid, perfil().supervisorId].toSet()
+        && request.resource.data.cantidadAdjuntos is int
+        && request.resource.data.cantidadAdjuntos >= 0
+        && request.resource.data.cantidadNotas == 0
+        && request.resource.data.fechaCreacion == request.time
+        && request.resource.data.fechaActualizacion == request.time;
+
+      // ---- Actualización ---------------------------------------
+
+      function antes() { return resource.data; }
+      function despues() { return request.resource.data; }
+
+      function esAsignado() { return antes().asignadoA == request.auth.uid; }
+      function esSolicitante() { return antes().solicitanteId == request.auth.uid; }
+
+      // Usuario al que se le asigna la tarea en una transición.
+      function perfilDe(uid) { return get(rutaUsuario(uid)).data; }
+
+      // Transición de un estado a otro con su etapa y su nuevo asignado.
+      function pasaA(estadoOrigen, estadoNuevo, etapaNueva) {
+        return antes().estadoActual == estadoOrigen
+          && despues().estadoActual == estadoNuevo
+          && despues().etapaActual == etapaNueva;
+      }
+
+      function quedaSinAsignado() {
+        return despues().asignadoA == null
+          && despues().asignadoNombre == null
+          && despues().rolAsignado == null;
+      }
+
+      // ⚠️ IMPORTANTE: tabla de transiciones (copia de TRANSICIONES en constantes.js).
+      // Cada línea: acción → estado de origen, estado y etapa nuevos, quién la ejecuta
+      // y a quién queda asignada después.
+      function transicionValida() {
+        return (
+          // aprobar: supervisor asignado → pasa a un usuario RH activo
+          (pasaA('enAprobacion', 'enGestionRh', 'gestionRh')
+            && tieneRol('supervisor') && esAsignado()
+            && despues().asignadoA is string
+            && perfilDe(despues().asignadoA).rol == 'rh'
+            && perfilDe(despues().asignadoA).activo == true
+            && despues().rolAsignado == 'rh')
+          // devolver: supervisor asignado → vuelve al solicitante
+          || (pasaA('enAprobacion', 'devuelta', 'solicitud')
+            && tieneRol('supervisor') && esAsignado()
+            && despues().asignadoA == antes().solicitanteId
+            && despues().rolAsignado == 'iniciador')
+          // reenviar: solicitante → vuelve a su supervisor
+          || (pasaA('devuelta', 'enAprobacion', 'aprobacion')
+            && tieneRol('iniciador') && esSolicitante()
+            && despues().asignadoA == antes().supervisorId
+            && despues().rolAsignado == 'supervisor')
+          // rechazar: supervisor asignado → finaliza
+          || (pasaA('enAprobacion', 'rechazada', 'finalizada')
+            && tieneRol('supervisor') && esAsignado() && quedaSinAsignado())
+          // completar: RH asignado → finaliza
+          || (pasaA('enGestionRh', 'completada', 'finalizada')
+            && tieneRol('rh') && esAsignado() && quedaSinAsignado())
+          // rechazarRh: RH asignado → finaliza
+          || (pasaA('enGestionRh', 'rechazada', 'finalizada')
+            && tieneRol('rh') && esAsignado() && quedaSinAsignado())
+          // cancelar: solicitante, mientras no fue aprobada → finaliza
+          || ((pasaA('enAprobacion', 'cancelada', 'finalizada') || pasaA('devuelta', 'cancelada', 'finalizada'))
+            && tieneRol('iniciador') && esSolicitante() && quedaSinAsignado())
+        )
+        // Después de cada transición el nuevo asignado todavía no la vio ("Nuevas"):
+        // vistaPorAsignado = false. En los estados finales no hay asignado: true.
+        && despues().vistaPorAsignado == (despues().estadoActual in estadosFinales());
+      }
+
+      // Actualización sin cambio de estado: marcar como vista, sumar una nota o un adjunto.
+      function seguimientoValido() {
+        return !camposModificados().hasAny(['etapaActual', 'estadoActual', 'asignadoA',
+                                            'asignadoNombre', 'rolAsignado'])
+          && !(antes().estadoActual in estadosFinales())
+          // Solo el asignado puede marcarla como vista (y no se puede "desver").
+          && (!camposModificados().hasAny(['vistaPorAsignado'])
+              || (esAsignado() && despues().vistaPorAsignado == true))
+          && (despues().cantidadNotas == antes().cantidadNotas
+              || despues().cantidadNotas == antes().cantidadNotas + 1)
+          && (despues().cantidadAdjuntos == antes().cantidadAdjuntos
+              || despues().cantidadAdjuntos == antes().cantidadAdjuntos + 1);
+      }
+
+      // Los participantes solo crecen, y solo con quien actúa y el nuevo asignado.
+      function participantesValidos() {
+        return despues().participantes.toSet().hasAll(antes().participantes)
+          && despues().participantes.toSet().difference(antes().participantes.toSet())
+               .hasOnly([request.auth.uid, despues().asignadoA]);
+      }
+
+      allow update: if puedeLeer(antes())
+        && (esAsignado() || esSolicitante() || request.auth.uid in antes().participantes)
+        && despues().keys().hasOnly(camposSolicitud())
+        // Campos que nunca cambian.
+        && !camposModificados().hasAny(['numero', 'solicitanteId', 'solicitanteNombre',
+                                        'supervisorId', 'fechaCreacion'])
+        // ⚠️ IMPORTANTE: los datos del permiso solo los corrige el solicitante cuando
+        // se la devolvieron (y se vuelven a validar).
+        && (!camposModificados().hasAny(['tipoPermiso', 'fechaInicio', 'fechaFin', 'cantidadDias', 'motivo'])
+            || (antes().estadoActual == 'devuelta' && esSolicitante()))
+        && datosPermisoValidos(despues())
+        && participantesValidos()
+        && despues().fechaActualizacion == request.time
+        && (despues().estadoActual == antes().estadoActual ? seguimientoValido() : transicionValida());
+
+      // Los trámites no se borran: se cancelan o se rechazan (trazabilidad).
+      allow delete: if false;
+
+      // =======================================================
+      // solicitudes/{solicitudId}/historial/{eventoId}
+      // =======================================================
+      match /historial/{eventoId} {
+
+        function rutaSolicitud() { return /databases/$(database)/documents/solicitudes/$(solicitudId); }
+
+        allow read: if puedeLeer(get(rutaSolicitud()).data);
+
+        // 📝 TRAZABILIDAD: el evento tiene que estar firmado por quien lo escribe,
+        // con su rol real y la hora del servidor, y ser coherente con la solicitud.
+        // getAfter() ve la solicitud como queda al terminar el lote de escrituras.
+        function eventoValido(e) {
+          return e.keys().hasOnly(['accion', 'usuarioId', 'usuarioNombre', 'rolUsuario', 'fecha',
+                                   'estadoAnterior', 'estadoNuevo', 'etapaAnterior', 'etapaNueva',
+                                   'comentario'])
+            && e.usuarioId == request.auth.uid
+            && e.usuarioNombre == perfil().nombre
+            && e.rolUsuario == perfil().rol
+            && e.fecha == request.time
+            && textoEntre(e.comentario, 0, 2000);
+        }
+
+        // Eventos que cambian el estado: tienen que coincidir con lo que realmente
+        // pasó en la solicitud en este mismo lote.
+        function cambioDeEstadoCoherente(e) {
+          return e.accion in ['creada', 'aprobada', 'devuelta', 'reenviada', 'rechazada', 'completada', 'cancelada']
+            && e.estadoNuevo == getAfter(rutaSolicitud()).data.estadoActual
+            && e.etapaNueva == getAfter(rutaSolicitud()).data.etapaActual
+            && (
+              // creada: la solicitud no existía antes de este lote
+              (e.accion == 'creada' && !exists(rutaSolicitud())
+                && e.estadoAnterior == null && e.etapaAnterior == null)
+              // el resto: el estado anterior es el que tenía antes del lote
+              || (e.accion != 'creada' && exists(rutaSolicitud())
+                && e.estadoAnterior == get(rutaSolicitud()).data.estadoActual
+                && e.etapaAnterior == get(rutaSolicitud()).data.etapaActual
+                && e.estadoAnterior != e.estadoNuevo)
+            )
+            // ⚠️ IMPORTANTE: devolver y rechazar exigen explicar el motivo.
+            && (!(e.accion in ['devuelta', 'rechazada']) || e.comentario.size() > 0);
+        }
+
+        // Notas y adjuntos: no cambian el estado.
+        function eventoSinCambioDeEstado(e) {
+          return e.accion in ['notaAgregada', 'adjuntoAgregado']
+            && e.estadoAnterior == null && e.estadoNuevo == null
+            && e.etapaAnterior == null && e.etapaNueva == null
+            && e.comentario.size() > 0;
+        }
+
+        allow create: if habilitado()
+          && request.auth.uid in getAfter(rutaSolicitud()).data.participantes
+          && eventoValido(request.resource.data)
+          && (cambioDeEstadoCoherente(request.resource.data)
+              || eventoSinCambioDeEstado(request.resource.data));
+
+        // 📝 TRAZABILIDAD: el historial es append-only. Nadie lo edita ni lo borra.
+        allow update, delete: if false;
+      }
+
+      // =======================================================
+      // solicitudes/{solicitudId}/adjuntos/{adjuntoId}
+      // =======================================================
+      match /adjuntos/{adjuntoId} {
+
+        function rutaSolicitud() { return /databases/$(database)/documents/solicitudes/$(solicitudId); }
+
+        allow read: if puedeLeer(get(rutaSolicitud()).data);
+
+        // 🔒 SEGURIDAD: límites de LIMITES_ADJUNTO (constantes.js).
+        //   600 KB = 614.400 bytes → 819.200 caracteres en base64.
+        //   Un documento de Firestore admite como máximo 1 MiB.
+        allow create: if habilitado()
+          && request.auth.uid in getAfter(rutaSolicitud()).data.participantes
+          && !(getAfter(rutaSolicitud()).data.estadoActual in estadosFinales())
+          && request.resource.data.keys().hasOnly(['nombreArchivo', 'tipoMime', 'tamanoBytes',
+                                                   'contenidoBase64', 'subidoPor', 'subidoPorNombre',
+                                                   'fechaSubida'])
+          && textoEntre(request.resource.data.nombreArchivo, 1, 200)
+          && request.resource.data.tipoMime in ['application/pdf', 'image/jpeg', 'image/png']
+          && request.resource.data.tamanoBytes is int
+          && request.resource.data.tamanoBytes > 0
+          && request.resource.data.tamanoBytes <= 614400
+          && textoEntre(request.resource.data.contenidoBase64, 1, 819200)
+          && request.resource.data.subidoPor == request.auth.uid
+          && request.resource.data.subidoPorNombre == perfil().nombre
+          && request.resource.data.fechaSubida == request.time;
+
+        // Un adjunto subido queda como evidencia del trámite.
+        allow update, delete: if false;
+      }
+    }
+  }
+}
