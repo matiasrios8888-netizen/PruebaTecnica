@@ -37,9 +37,9 @@ Todo bug o error detectado queda registrado acá, **aunque se corrija en el mome
 | BUG-004 | Consultas huérfanas al cerrar sesión con datos cargando | Baja | ✅ Resuelto | Fase 2 | `fix/bugs-pre-fase-3` |
 | BUG-005 | Los mensajes de error de los formularios no se ocultaban al corregir | Baja | ✅ Resuelto | Fase 2 | `fix/bugs-pre-fase-3` |
 | BUG-006 | Recargar los datos de prueba cerraba las sesiones abiertas | Baja | ✅ Resuelto | Fase 3 | `fix/BUG-006-seed-cierra-sesiones` |
-| BUG-007 | La columna de acciones del detalle se desborda en pantallas medianas | Media | 🔴 Abierto | Fase 3 | — |
+| BUG-007 | Desbordes horizontales: columna de acciones del detalle y tablas en celulares | Media | ✅ Resuelto | Fase 3 | `fix/BUG-007-desborde-columna-acciones` |
 
-**Abiertos: 1**
+**Abiertos: 0**
 
 > BUG-004 y BUG-005 se corrigieron juntos en la rama `fix/bugs-pre-fase-3`, antes de existir la regla de "una rama por bug". Desde ahora cada bug va en su propia rama `fix/BUG-NNN-…`.
 
@@ -103,11 +103,17 @@ Todo bug o error detectado queda registrado acá, **aunque se corrija en el mome
 - **Commit:** rama `fix/BUG-006-seed-cierra-sesiones`.
 - **Test de regresión:** prueba en el navegador. Iniciar sesión → `npm run seed` → recargar la página: la sesión sigue abierta y no hay respuestas con error. Además, `npm test` (28 + 44) en verde.
 
-### BUG-007 · La columna de acciones del detalle se desborda en pantallas medianas
-- **Detectado:** Fase 3, revisando una captura del detalle de una solicitud con acciones.
-- **Severidad:** Media (se ve mal y aparece scroll horizontal).
-- **Cómo reproducir:** abrir el detalle de una solicitud con acciones disponibles en una ventana de 1024 a 1550 px de ancho: la columna derecha (Acciones, Nota, Adjuntos) sobresale de la grilla (por ejemplo, 42 px a 1440 px).
-- **Estado:** Abierto. Se corrige en su propia rama `fix/BUG-007-…`.
+### BUG-007 · Desbordes horizontales: columna de acciones del detalle y tablas en celulares
+- **Detectado:** Fase 3, revisando una captura del detalle de una solicitud con acciones. Al medir se encontró una segunda manifestación.
+- **Severidad:** Media (se ve mal y aparece scroll horizontal en toda la página).
+- **Cómo reproducir:**
+  1. Abrir el detalle de una solicitud con acciones en una ventana de 1024 a 1550 px: la columna derecha sobresale de la grilla (42 px a 1440 px). A 800 px, el selector de archivo genera scroll horizontal.
+  2. Abrir el inicio en un celular (390 px): la página entera tiene scroll horizontal del doble del ancho, porque la tabla empuja.
+- **Causa:** en CSS Grid, cada elemento tiene por defecto `min-width: auto`: no se achica por debajo del ancho mínimo de su contenido. El `<textarea>` y el `<input type="file">` tienen un ancho propio (~300 px) mayor que la columna de acciones (304 px de pista contra 297 px de contenido más el padding de la tarjeta), y la tabla es más ancha que un celular. Como `.columna`, `.formulario`, `.campo` y `.contenido` son grillas, el contenido empujaba hacia afuera.
+- **Solución:** `min-width: 0` en los hijos de esas grillas (`.contenido > *`, `.columna`, `.columna > *`, `.formulario > *`, `.campo`, `.campo > *`) y `max-width: 100%` en `input[type="file"]`. La tabla conserva su propio scroll interno (`.tabla-contenedor`).
+- **Commit:** rama `fix/BUG-007-desborde-columna-acciones`.
+- **Test de regresión:** medición automática en el navegador del desborde de las tarjetas y del scroll horizontal de la página en 10 anchos (1550 → 320 px), para el detalle con acciones y para el inicio: todo en 0. En el celular, la tabla mantiene su scroll interno. `npm test` en verde.
+
 ---
 
 ## Observaciones (no son bugs de la app)

@@ -514,6 +514,24 @@ a {
   gap: 12px;
 }
 
+/* BUGS.md · BUG-007: en una grilla, cada elemento tiene min-width: auto, es decir,
+   no se achica por debajo del ancho mínimo de su contenido. Un <textarea> o un
+   <input type="file"> tienen un ancho propio (~300 px) que empujaba la tarjeta
+   fuera de la columna de acciones. Lo mismo pasaba con las tablas en celulares
+   (.contenido también es una grilla). min-width: 0 les permite ajustarse al espacio. */
+.contenido > *,
+.columna,
+.columna > *,
+.formulario > *,
+.campo,
+.campo > * {
+  min-width: 0;
+}
+
+input[type='file'] {
+  max-width: 100%;
+}
+
 .lista-adjuntos {
   list-style: none;
   margin: 0;

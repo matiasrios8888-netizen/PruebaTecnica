@@ -475,3 +475,23 @@ Construimos el flujo completo Solicitar → Aprobar → Gestionar RH de punta a 
   - `git merge --no-ff fix/BUG-006-seed-cierra-sesiones` (en `main`): integración.
 - **Cómo probarlo:** abrí la app y logueate; en otra terminal corré `npm run seed` (desde `scripts/`); recargá la app: seguís logueado.
 - **Pendientes o dudas:** BUG-007 (desborde de la columna de acciones) sigue abierto y se corrige a continuación, en su propia rama.
+
+---
+
+## 2026-10-15 – Corrección – BUG-007: desbordes horizontales en el detalle y en celulares
+
+- **Qué hicimos:** en la rama `fix/BUG-007-desborde-columna-acciones`, creada desde `main`, medimos con precisión qué elemento se desbordaba antes de tocar el CSS. Encontramos la causa (el `min-width: auto` de los elementos de una grilla) y dos lugares donde aparecía: la columna de acciones del detalle y las tablas en celulares. Corregimos los dos con la misma regla y verificamos en 10 anchos de pantalla.
+- **Archivos creados o modificados:**
+  - `src/styles/main.css`: `min-width: 0` en los hijos de las grillas (`.contenido`, `.columna`, `.formulario`, `.campo`) y `max-width: 100%` en el selector de archivos.
+  - `BUGS.md`: BUG-007 resuelto (con las dos manifestaciones). Quedan 0 abiertos.
+- **Conceptos aprendidos:**
+  - **`min-width: auto` en CSS Grid y Flexbox:** por defecto un elemento no se achica por debajo del ancho mínimo de su contenido. Si ese contenido es rígido (un `<textarea>`, un `<input type="file">`, una tabla), empuja hacia afuera aunque tenga `width: 100%`. `min-width: 0` le permite ajustarse.
+  - **Medir antes de corregir:** se buscó con código qué elemento sobrepasaba su contenedor (`getBoundingClientRect`) en cada ancho. Así apareció la segunda manifestación, en celulares, que en una captura no se veía.
+  - **Diseño responsive:** probar en varios anchos (celular, tablet, notebook, monitor grande), no solo en el de la propia pantalla.
+- **Comandos usados:**
+  - `git switch -c fix/BUG-007-desborde-columna-acciones` (desde `main`).
+  - Medición en el navegador de desborde y scroll horizontal en 1550, 1440, 1280, 1024, 900, 800, 761, 760, 600 y 390 px (y 320 px en el inicio): todo en 0.
+  - `npm test`: 28 + 44 en verde.
+  - `git merge --no-ff fix/BUG-007-desborde-columna-acciones` (en `main`).
+- **Cómo probarlo:** abrí el detalle de una solicitud con acciones y achicá la ventana del navegador de a poco: la columna derecha nunca sobresale. En modo celular (F12 → ícono de dispositivo móvil) la tabla del inicio se desplaza dentro de su recuadro, y la página no se corre de costado.
+- **Pendientes o dudas:** ninguno. Siguiente: traer `main` (con BUG-006 y BUG-007) a `feature/bandeja` y terminar la Fase 3.
