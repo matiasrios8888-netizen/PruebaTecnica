@@ -324,3 +324,47 @@ Armamos la base de una app de permisos con arquitectura en capas (UI → servici
   2. **Nueva solicitud** → probá elegir Enfermedad sin adjuntar nada (error) y después con un PDF chico (se crea).
   3. Entrá como `supervisor@bprosys.test`: no vas a ver "Nueva solicitud" en el menú.
 - **Pendientes o dudas:** al crear, la app vuelve al inicio porque la pantalla de detalle se construye en el próximo paso.
+
+---
+
+## 2026-10-15 – Fase 2 – Paso: pantalla de detalle de la solicitud
+
+- **Qué hicimos:** construimos el detalle del trámite, donde ocurre todo el flujo. Muestra:
+  - la etapa en una barra de progreso y a quién está esperando;
+  - los datos del permiso (editables solo para quien puede corregirlos);
+  - un botón por cada acción permitida, con un comentario que queda en el historial;
+  - formularios para agregar notas y adjuntos;
+  - los adjuntos, que se pueden abrir;
+  - la línea de tiempo completa del historial.
+
+  Al crear una solicitud, la app ahora abre directamente su detalle.
+- **Archivos creados o modificados:**
+  - `src/ui/pantallas/detalleSolicitudPantalla.js`: la pantalla. No decide permisos: muestra lo que devuelve el servicio (`acciones`, `puedeCorregirDatos`, `puedeAgregarSeguimiento`).
+  - `src/config/constantes.js`: `NOMBRES_ACCION` (texto de cada botón).
+  - `src/services/solicitudesServicio.js`: mensaje único "La solicitud no existe o no tenés permiso para verla".
+  - `src/services/errores.js`: el detalle técnico de los errores va a la consola como advertencia.
+  - `src/styles/main.css`: clases del detalle (etapas, columnas, mensaje de alerta, texto para lectores de pantalla). La pantalla no usa estilos escritos dentro del HTML.
+  - `src/main.js`: registra la ruta `#/solicitudes/:id`.
+- **Conceptos aprendidos:**
+  - **Control de campos por rol:** los datos del permiso se dibujan como campos deshabilitados. Solo se habilitan para la solicitante cuando le devolvieron la solicitud, y se guardan al "Reenviar corregida". Lo decide `puedeCorregirDatos` (flujoSolicitud.js) y lo vuelven a exigir las reglas.
+  - **La UI muestra, el servicio decide:** la pantalla no tiene ningún `if (rol === ...)`: dibuja un botón por cada acción que le devuelve el servicio.
+  - **No revelar si algo existe:** ante un id inexistente o ajeno se muestra el mismo mensaje, igual que hace Firestore.
+  - **URL temporal (`blob:`):** los adjuntos guardados en base64 se convierten en un archivo en memoria para abrirlos en otra pestaña. Después se libera con `URL.revokeObjectURL`.
+  - **Confirmación antes de acciones irreversibles:** rechazar y cancelar piden confirmación.
+- **Comandos usados:**
+  - Prueba en el navegador (Playwright) **haciendo clic como cada usuario**:
+    1. Ana crea y agrega una nota.
+    2. Carlos intenta devolver sin comentario (error) y después devuelve.
+    3. Ana ve los campos habilitados, corrige las fechas a enero y reenvía (5 días).
+    4. Carlos aprueba → queda "Esperando a Laura Fernández".
+    5. Laura adjunta un PDF, lo abre en otra pestaña y completa.
+    6. Ana ve el trámite finalizado, sin acciones ni notas, con 7 eventos en el historial.
+
+    Un id inexistente muestra el mensaje genérico.
+- **Cómo probarlo:**
+  1. Live Server (si no ves los cambios: **Ctrl + F5**).
+  2. Como `iniciador@bprosys.test` → **Nueva solicitud** → al enviarla se abre su detalle.
+  3. Copiá la URL. Salí, entrá como `supervisor@bprosys.test`, pegá la URL y probá **Devolver** sin comentario (error) y con comentario.
+  4. Volvé como iniciador: los campos ahora se pueden editar → **Reenviar corregida**.
+  5. Supervisor → **Aprobar**; `rh@bprosys.test` → adjuntá un archivo → **Completar gestión**.
+- **Pendientes o dudas:** por ahora a una solicitud se llega por su URL; en el próximo paso el inicio lista las tareas y solicitudes del usuario.

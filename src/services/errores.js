@@ -52,6 +52,6 @@ const MENSAJES_ERROR_FIRESTORE = {
 export function aErrorAplicacion(error, mensajePorDefecto = 'Ocurrió un error inesperado. Volvé a intentar.') {
   if (error instanceof ErrorAplicacion) return error;
   const codigo = error?.code ?? 'desconocido';
-  console.error('[errores]', codigo, error); // detalle técnico solo en consola
+  console.warn('[errores]', codigo, error); // detalle técnico solo en consola, para depurar
   return new ErrorAplicacion(MENSAJES_ERROR_FIRESTORE[codigo] ?? mensajePorDefecto, codigo, error);
 }

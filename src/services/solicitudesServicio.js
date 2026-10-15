@@ -170,8 +170,16 @@ export async function crearSolicitud(datosFormulario, archivos = []) {
 export async function obtenerDetalle(id) {
   try {
     const usuario = usuarioRequerido();
-    const solicitud = await repositorio.obtenerSolicitud(id);
-    if (!solicitud) throw new ErrorAplicacion('La solicitud no existe.', 'noExiste');
+    // 🔒 SEGURIDAD: Firestore no distingue "no existe" de "no podés verla" (las reglas
+    // rechazan leer un documento inexistente). Se usa un único mensaje para ambos casos,
+    // así tampoco se revela si un id existe.
+    const solicitud = await repositorio.obtenerSolicitud(id).catch((error) => {
+      if (error?.code === 'permission-denied') return null;
+      throw error;
+    });
+    if (!solicitud) {
+      throw new ErrorAplicacion('La solicitud no existe o no tenés permiso para verla.', 'noDisponible');
+    }
 
     const [historial, adjuntos] = await Promise.all([repositorio.listarHistorial(id), repositorio.listarAdjuntos(id)]);
 

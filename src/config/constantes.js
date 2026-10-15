@@ -194,6 +194,18 @@ export const ACCIONES = Object.freeze({
   CANCELAR: 'cancelar',
 });
 
+/** Texto del botón de cada acción en la pantalla de detalle. */
+export const NOMBRES_ACCION = Object.freeze({
+  [ACCIONES.CREAR]: 'Crear solicitud',
+  [ACCIONES.APROBAR]: 'Aprobar',
+  [ACCIONES.DEVOLVER]: 'Devolver para corregir',
+  [ACCIONES.REENVIAR]: 'Reenviar corregida',
+  [ACCIONES.RECHAZAR]: 'Rechazar',
+  [ACCIONES.COMPLETAR]: 'Completar gestión',
+  [ACCIONES.RECHAZAR_RH]: 'Rechazar en RH',
+  [ACCIONES.CANCELAR]: 'Cancelar solicitud',
+});
+
 /**
  * Quién puede ejecutar una acción, además de tener el rol requerido:
  *   - ASIGNADO: el usuario que figura en "asignadoA" de la solicitud.

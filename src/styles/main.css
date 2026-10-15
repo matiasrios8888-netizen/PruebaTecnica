@@ -455,6 +455,60 @@ a {
   }
 }
 
+.columna {
+  display: grid;
+  gap: 16px;
+}
+
+.etapas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0;
+}
+
+.etapas__paso {
+  color: var(--color-texto-suave);
+}
+
+.etapas__paso--actual {
+  font-weight: 700;
+  color: var(--color-primario);
+}
+
+.etapas__separador {
+  color: var(--color-borde);
+}
+
+.mensaje-alerta {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--color-alerta-fondo);
+  color: var(--color-alerta);
+  font-size: 0.9rem;
+}
+
+.acciones--izquierda {
+  justify-content: flex-start;
+}
+
+.formulario--separado {
+  margin-top: 12px;
+}
+
+/* Texto solo para lectores de pantalla (accesibilidad) */
+.solo-lectores {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .panel-acciones {
   display: grid;
   gap: 12px;

@@ -24,10 +24,12 @@ import {
   RUTA_LOGIN,
   RUTA_INICIO,
   RUTA_NUEVA_SOLICITUD,
+  RUTA_DETALLE_SOLICITUD,
 } from './ui/router.js';
 import { renderizarLogin } from './ui/pantallas/loginPantalla.js';
 import { renderizarInicio } from './ui/pantallas/inicioPantalla.js';
 import { renderizarNuevaSolicitud } from './ui/pantallas/nuevaSolicitudPantalla.js';
+import { renderizarDetalleSolicitud } from './ui/pantallas/detalleSolicitudPantalla.js';
 
 const contenedor = document.getElementById('app');
 
@@ -35,6 +37,9 @@ registrarRuta(RUTA_LOGIN, renderizarLogin, { publica: true });
 registrarRuta(RUTA_INICIO, renderizarInicio);
 // ⚠️ IMPORTANTE: solo el iniciador crea solicitudes (también lo exigen el servicio y las reglas).
 registrarRuta(RUTA_NUEVA_SOLICITUD, renderizarNuevaSolicitud, { roles: [ROLES.INICIADOR] });
+// Cualquier usuario logueado puede pedir un detalle; si no le corresponde verlo,
+// firestore.rules rechaza la lectura y la pantalla muestra el error.
+registrarRuta(RUTA_DETALLE_SOLICITUD, renderizarDetalleSolicitud);
 
 iniciarRouter(contenedor, obtenerUsuarioActual);
 
