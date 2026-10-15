@@ -25,6 +25,15 @@ export function formatearFechaHora(timestamp) {
 }
 
 /**
+ * Date del navegador → "15/10/26, 12:51" (por ejemplo, el momento de un reporte).
+ * @param {Date} fecha
+ * @returns {string}
+ */
+export function formatearMomento(fecha) {
+  return formatoFechaHora.format(fecha);
+}
+
+/**
  * "2026-11-03" → "03/11/2026" (sin pasar por Date, para no correr el día por la zona horaria).
  * @param {string} fecha
  * @returns {string}

@@ -39,6 +39,7 @@ Todo bug o error detectado queda registrado acá, **aunque se corrija en el mome
 | BUG-006 | Recargar los datos de prueba cerraba las sesiones abiertas | Baja | ✅ Resuelto | Fase 3 | `fix/BUG-006-seed-cierra-sesiones` |
 | BUG-007 | Desbordes horizontales: columna de acciones del detalle y tablas en celulares | Media | ✅ Resuelto | Fase 3 | `fix/BUG-007-desborde-columna-acciones` |
 | BUG-008 | El aviso de una acción seguía visible después de cerrar sesión | Baja | ✅ Resuelto | Fase 4 | `fix/BUG-008-avisos-entre-sesiones` |
+| BUG-009 | La pantalla de reportes desbordaba a lo ancho en celulares de 320 px | Media | ✅ Resuelto | Fase 5 | `feature/reportes` (antes del merge) |
 
 **Abiertos: 0**
 
@@ -129,6 +130,17 @@ Todo bug o error detectado queda registrado acá, **aunque se corrija en el mome
   - Ana agrega una nota y sale enseguida: la zona de avisos queda vacía en el login.
   - Al volver a entrar, un aviso nuevo se muestra normalmente.
   - `npm test` en verde (54 + 52).
+
+
+### BUG-009 · La pantalla de reportes desbordaba a lo ancho en celulares de 320 px
+- **Detectado:** Fase 5, en la prueba del Paso 2. Se midió el desborde horizontal en varios anchos: a 320 px la página medía 379 px.
+- **Severidad:** Media (aparece scroll horizontal en toda la pantalla).
+- **Cómo reproducir:** entrar como RH o admin → Reportes → abrir "Ver los datos en una tabla" → achicar la ventana a 320 px.
+- **Causa:** el mismo mecanismo que el BUG-007. El contenedor nuevo `.reportes` es una grilla, y sus tarjetas tenían el `min-width: auto` por defecto: no se achicaban por debajo del ancho mínimo de la tabla de datos.
+- **Solución:** `.reportes > * { min-width: 0; }`. La tabla conserva su propio scroll interno.
+- **Commit:** rama `feature/reportes`. Se corrigió en la misma rama porque el código todavía no había llegado a `main` (regla de `CLAUDE.md`).
+- **Test de regresión:** medición automática del desborde horizontal en 7 anchos (1440, 1024, 800, 520, 390, 360 y 320 px), con la tabla abierta: todos en 0.
+- **Lección:** cada contenedor nuevo que sea una grilla necesita `min-width: 0` en sus hijos. Desde ahora, la prueba de cada pantalla nueva incluye esta medición en varios anchos.
 
 ---
 

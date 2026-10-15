@@ -958,3 +958,43 @@ Construimos el mantenimiento de usuarios y roles para el administrador:
   - `npm run test:reglas`: 73, 4 nuevos. Con los datos de los tests, RH cuenta 3 en aprobación y admin lista 5 abiertos.
 - **Cómo probarlo:** desde `scripts/`, correr `npm test`.
 - **Pendientes o dudas:** la pantalla de reportes se hace en los pasos siguientes.
+
+## 2026-10-15 – Fase 5 – Paso: pantalla de reportes y distribución por etapa
+
+- **Qué hicimos:**
+  - RH y admin tienen un enlace nuevo, "Reportes", con:
+    - **tres indicadores:** total de trámites, en curso y finalizados;
+    - **el gráfico de distribución por etapa:** barras horizontales en el orden del proceso, con el valor y el porcentaje al final de cada barra y el detalle por estado debajo de cada etapa;
+    - **la tabla de datos** desplegable, como alternativa accesible.
+  - **Tooltip:** cada barra lo muestra con el mouse y con el teclado (Tab).
+  - **Actualizar:** el botón vuelve a leer los datos; mientras tanto, el reporte anterior queda atenuado, sin saltos.
+  - **Diseño:** seguimos la guía de visualización de datos. Primero elegimos la forma (barras horizontales), después el color: las etapas tienen un orden, así que llevan una escala de un solo tono, de claro a oscuro. Por último **validamos la paleta con un script** en vez de elegirla a ojo.
+- **Archivos creados o modificados:**
+  - `src/services/reportesServicio.js` (nuevo): `cargarReportes()`. Hace en paralelo 6 conteos, los abiertos y los usuarios. Solo para RH y admin.
+  - `src/ui/componentes/graficoBarras.js` (nuevo): gráfico de barras horizontales en HTML y CSS, sin librerías, con segmentos apilables.
+  - `src/ui/utils/tooltip.js` (nuevo): tooltip con mouse y teclado, contenido con `textContent` y un solo listener de scroll para toda la app.
+  - `src/ui/pantallas/reportesPantalla.js` (nuevo).
+  - `src/ui/utils/formato.js`: `formatearMomento()`, para una fecha y hora del navegador.
+  - `src/ui/router.js`, `src/main.js` y `src/ui/componentes/marco.js`: ruta `#/reportes` para RH y admin, y el enlace en el menú.
+  - `src/styles/main.css`:
+    - colores de los gráficos como variables;
+    - indicadores, barras, tooltip y tabla de datos;
+    - solo las filas con `data-id` (las que abren algo) muestran la manito;
+    - corrección del BUG-009.
+  - `BUGS.md`: BUG-009.
+- **Conceptos aprendidos:**
+  - **Escala ordinal:** cuando las categorías tienen un orden (las etapas de un proceso), el color puede mostrar ese orden con un solo tono, de claro a oscuro. Si no tuvieran orden, todas las barras irían del mismo color.
+  - **Validar colores con un script:** el validador revisa que los tonos se distingan también con daltonismo y que tengan contraste suficiente contra el fondo. "Se ven distintos" no alcanza.
+  - **Gráficos accesibles:** el texto nunca va en el color de la serie, cada valor también está escrito o en la tabla, y el tooltip funciona con el teclado.
+  - **Delegación de eventos:** el tooltip escucha en el contenedor y usa `closest('[data-tooltip-valor]')`. Un solo listener sirve aunque las barras se vuelvan a dibujar.
+- **Comandos usados:**
+  - `node scripts/validate_palette.js "#86b6ef,#3987e5,#1c5cab,#0d366b" --ordinal --surface "#ffffff"`: todo PASS.
+  - `node scripts/validate_palette.js "#2a78d6,#eb6834" --surface "#ffffff"`: todo PASS, con una diferencia con daltonismo de ΔE 24,7.
+  - Prueba en el navegador:
+    - Carlos no ve "Reportes", y `#/reportes` lo lleva a la bandeja.
+    - Laura ve 10 / 7 / 3, y por etapa 1 (10%), 3, 3 y 3 (30%), con "Completada 2 · Rechazada 1". Coincide con el seed.
+    - El tooltip funciona con el mouse y con el teclado, la tabla también suma 10 y "Actualizar" funciona.
+    - Sin errores en la consola. Se corrigió el doble punto de "p. m..".
+    - El desborde horizontal se midió en 7 anchos y todos dan 0, después de corregir el BUG-009.
+- **Cómo probarlo:** entrar con `rh@bprosys.test` o `admin@bprosys.test` → Reportes. Pasar el mouse por las barras, o recorrerlas con Tab, y abrir "Ver los datos en una tabla".
+- **Pendientes o dudas:** en el paso siguiente se suma la carga de pendientes por usuario.
