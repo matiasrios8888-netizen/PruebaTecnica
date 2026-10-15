@@ -11,7 +11,7 @@
  * =============================================================
  */
 
-import { db, doc, getDoc } from '../config/firebase.js';
+import { db, doc, getDoc, getDocs, collection, query, where } from '../config/firebase.js';
 import { COLECCIONES } from '../config/constantes.js';
 
 /** @typedef {import('./modelos.js').Usuario} Usuario */
@@ -27,4 +27,16 @@ export async function obtenerUsuarioPorId(uid) {
   const snapshot = await getDoc(doc(db, COLECCIONES.USUARIOS, uid));
   if (!snapshot.exists()) return null;
   return /** @type {Usuario} */ ({ id: snapshot.id, ...snapshot.data() });
+}
+
+/**
+ * Lista los usuarios que tienen un rol (activos e inactivos).
+ * Se usa, por ejemplo, para el reparto rotativo de RH al aprobar.
+ * @param {string} rol - Una de ROLES.
+ * @returns {Promise<Usuario[]>}
+ * @throws {import('https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js').FirebaseError}
+ */
+export async function listarUsuariosPorRol(rol) {
+  const resultado = await getDocs(query(collection(db, COLECCIONES.USUARIOS), where('rol', '==', rol)));
+  return resultado.docs.map((d) => /** @type {Usuario} */ ({ id: d.id, ...d.data() }));
 }

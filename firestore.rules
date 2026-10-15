@@ -20,6 +20,10 @@
 //     consulta filtrando por un campo que la regla revisa (asignadoA,
 //     participantes, solicitanteId…).
 //   - firebase-admin (scripts/seed.mjs) NO pasa por estas reglas.
+//   - 📝 Trazabilidad en las dos direcciones: todo cambio de una solicitud apunta
+//     (ultimoEventoId) a un evento nuevo del historial, y cada evento tiene que
+//     coincidir con el cambio real de la solicitud en el mismo lote.
+//   - Cada cambio de este archivo va con tests: scripts/tests/reglas.test.mjs.
 //
 // Publicar: firebase deploy --only firestore:rules
 // =============================================================
@@ -47,6 +51,14 @@ service cloud.firestore {
         'maternidadPaternidad': 90
       };
     }
+
+    // Tipos que exigen al menos un adjunto (requiereAdjunto en CONFIG_TIPOS_PERMISO).
+    function tiposConAdjuntoObligatorio() {
+      return ['enfermedad', 'estudio', 'duelo', 'maternidadPaternidad'];
+    }
+
+    // Contador de la numeración correlativa (NUMERACION_SOLICITUD).
+    function rutaContador() { return /databases/$(database)/documents/contadores/solicitudes; }
 
     // ---------------------------------------------------------
     // Usuario que hace la petición
@@ -146,6 +158,24 @@ service cloud.firestore {
     }
 
     // =========================================================
+    // contadores/{contadorId}
+    // =========================================================
+    match /contadores/{contadorId} {
+      allow read: if habilitado();
+
+      // ⚠️ IMPORTANTE: el contador de solicitudes solo sube de a 1. Lo incrementa el
+      // iniciador dentro de la transacción que crea la solicitud; la regla de creación
+      // de solicitudes exige que el "numero" coincida con el valor nuevo.
+      allow update: if tieneRol('iniciador')
+        && contadorId == 'solicitudes'
+        && request.resource.data.keys().hasOnly(['ultimoNumero'])
+        && request.resource.data.ultimoNumero == resource.data.ultimoNumero + 1;
+
+      // El contador lo crea el script de datos de prueba (firebase-admin).
+      allow create, delete: if false;
+    }
+
+    // =========================================================
     // solicitudes/{solicitudId}
     // =========================================================
     match /solicitudes/{solicitudId} {
@@ -174,7 +204,7 @@ service cloud.firestore {
                 'solicitanteId', 'solicitanteNombre', 'supervisorId',
                 'etapaActual', 'estadoActual', 'asignadoA', 'asignadoNombre', 'rolAsignado',
                 'vistaPorAsignado', 'participantes', 'cantidadAdjuntos', 'cantidadNotas',
-                'fechaCreacion', 'fechaActualizacion'];
+                'ultimoEventoId', 'fechaCreacion', 'fechaActualizacion'];
       }
 
       // ⚠️ IMPORTANTE: reglas de negocio de los datos del permiso.
@@ -186,21 +216,46 @@ service cloud.firestore {
           && d.cantidadDias is int
           && d.cantidadDias >= 1
           && d.cantidadDias <= diasMaximosPorTipo()[d.tipoPermiso]
-          && textoEntre(d.motivo, 1, 1000);
+          && textoEntre(d.motivo, 1, 1000)
+          // ⚠️ IMPORTANTE: algunos tipos exigen documentación (ej: certificado médico).
+          && (!(d.tipoPermiso in tiposConAdjuntoObligatorio()) || d.cantidadAdjuntos >= 1);
+      }
+
+      // 📝 TRAZABILIDAD: el evento "eventoId" del historial se crea en ESTE lote
+      // (no existía antes y existe después). Así ningún cambio queda sin registrar.
+      function eventoNuevoEnEsteLote(eventoId) {
+        return eventoId is string
+          && existsAfter(/databases/$(database)/documents/solicitudes/$(solicitudId)/historial/$(eventoId))
+          && !exists(/databases/$(database)/documents/solicitudes/$(solicitudId)/historial/$(eventoId));
+      }
+
+      // ⚠️ IMPORTANTE: el número es el siguiente del contador, que sube de a 1 en el mismo
+      // lote. "SOL-" + 4 dígitos: la expresión regular admite ceros a la izquierda.
+      function numeroCorrelativoValido(numero) {
+        let numeroNuevo = getAfter(rutaContador()).data.ultimoNumero;
+        return numeroNuevo == get(rutaContador()).data.ultimoNumero + 1
+          && numero is string
+          && numero.size() == 8
+          && numero.matches('^SOL-0*' + string(numeroNuevo) + '$');
       }
 
       // ---- Creación --------------------------------------------
 
+      // Perfil de otro usuario (supervisor o RH al que se asigna la tarea).
+      function perfilDe(uid) { return get(rutaUsuario(uid)).data; }
+
       // ⚠️ IMPORTANTE: solo un iniciador crea solicitudes, siempre a su nombre,
-      // en estado "enAprobacion" y asignadas a SU supervisor (no a quien elija).
+      // en estado "enAprobacion" y asignadas a SU supervisor activo (no a quien elija).
       allow create: if tieneRol('iniciador')
         && request.resource.data.keys().hasOnly(camposSolicitud())
         && request.resource.data.keys().hasAll(camposSolicitud())
         && datosPermisoValidos(request.resource.data)
-        && textoEntre(request.resource.data.numero, 1, 20)
+        && numeroCorrelativoValido(request.resource.data.numero)
+        && eventoNuevoEnEsteLote(request.resource.data.ultimoEventoId)
         && request.resource.data.solicitanteId == request.auth.uid
         && request.resource.data.solicitanteNombre == perfil().nombre
         && perfil().supervisorId is string
+        && perfilDe(perfil().supervisorId).activo == true
         && request.resource.data.supervisorId == perfil().supervisorId
         && request.resource.data.estadoActual == 'enAprobacion'
         && request.resource.data.etapaActual == 'aprobacion'
@@ -222,9 +277,6 @@ service cloud.firestore {
 
       function esAsignado() { return antes().asignadoA == request.auth.uid; }
       function esSolicitante() { return antes().solicitanteId == request.auth.uid; }
-
-      // Usuario al que se le asigna la tarea en una transición.
-      function perfilDe(uid) { return get(rutaUsuario(uid)).data; }
 
       // Transición de un estado a otro con su etapa y su nuevo asignado.
       function pasaA(estadoOrigen, estadoNuevo, etapaNueva) {
@@ -300,19 +352,29 @@ service cloud.firestore {
                .hasOnly([request.auth.uid, despues().asignadoA]);
       }
 
+      // 📝 TRAZABILIDAD: el único cambio que no deja evento es marcar la solicitud
+      // como vista. Cualquier otro (estado, nota, adjunto, datos) tiene que apuntar
+      // en "ultimoEventoId" a un evento del historial creado en este mismo lote.
+      function trazabilidadValida() {
+        return camposModificados().hasOnly(['vistaPorAsignado', 'fechaActualizacion'])
+          || (despues().ultimoEventoId != antes().ultimoEventoId
+              && eventoNuevoEnEsteLote(despues().ultimoEventoId));
+      }
+
       allow update: if puedeLeer(antes())
         && (esAsignado() || esSolicitante() || request.auth.uid in antes().participantes)
         && despues().keys().hasOnly(camposSolicitud())
         // Campos que nunca cambian.
         && !camposModificados().hasAny(['numero', 'solicitanteId', 'solicitanteNombre',
                                         'supervisorId', 'fechaCreacion'])
-        // ⚠️ IMPORTANTE: los datos del permiso solo los corrige el solicitante cuando
-        // se la devolvieron (y se vuelven a validar).
+        // ⚠️ IMPORTANTE: los datos del permiso solo los corrige el solicitante al
+        // reenviar una solicitud que le devolvieron (y se vuelven a validar).
         && (!camposModificados().hasAny(['tipoPermiso', 'fechaInicio', 'fechaFin', 'cantidadDias', 'motivo'])
-            || (antes().estadoActual == 'devuelta' && esSolicitante()))
+            || (pasaA('devuelta', 'enAprobacion', 'aprobacion') && esSolicitante()))
         && datosPermisoValidos(despues())
         && participantesValidos()
         && despues().fechaActualizacion == request.time
+        && trazabilidadValida()
         && (despues().estadoActual == antes().estadoActual ? seguimientoValido() : transicionValida());
 
       // Los trámites no se borran: se cancelan o se rechazan (trazabilidad).
@@ -325,7 +387,14 @@ service cloud.firestore {
 
         function rutaSolicitud() { return /databases/$(database)/documents/solicitudes/$(solicitudId); }
 
-        allow read: if puedeLeer(get(rutaSolicitud()).data);
+        // La solicitud antes del lote (get) y como queda al terminarlo (getAfter).
+        function solicitudAntes() { return get(rutaSolicitud()).data; }
+        function solicitudDespues() { return getAfter(rutaSolicitud()).data; }
+
+        // 📝 TRAZABILIDAD: la solicitud apunta a este evento como su último cambio.
+        function esUltimoEvento() { return solicitudDespues().ultimoEventoId == eventoId; }
+
+        allow read: if puedeLeer(solicitudAntes());
 
         // 📝 TRAZABILIDAD: el evento tiene que estar firmado por quien lo escribe,
         // con su rol real y la hora del servidor, y ser coherente con la solicitud.
@@ -345,35 +414,57 @@ service cloud.firestore {
         // pasó en la solicitud en este mismo lote.
         function cambioDeEstadoCoherente(e) {
           return e.accion in ['creada', 'aprobada', 'devuelta', 'reenviada', 'rechazada', 'completada', 'cancelada']
-            && e.estadoNuevo == getAfter(rutaSolicitud()).data.estadoActual
-            && e.etapaNueva == getAfter(rutaSolicitud()).data.etapaActual
+            && esUltimoEvento()
+            && e.estadoNuevo == solicitudDespues().estadoActual
+            && e.etapaNueva == solicitudDespues().etapaActual
             && (
               // creada: la solicitud no existía antes de este lote
               (e.accion == 'creada' && !exists(rutaSolicitud())
                 && e.estadoAnterior == null && e.etapaAnterior == null)
               // el resto: el estado anterior es el que tenía antes del lote
               || (e.accion != 'creada' && exists(rutaSolicitud())
-                && e.estadoAnterior == get(rutaSolicitud()).data.estadoActual
-                && e.etapaAnterior == get(rutaSolicitud()).data.etapaActual
+                && e.estadoAnterior == solicitudAntes().estadoActual
+                && e.etapaAnterior == solicitudAntes().etapaActual
                 && e.estadoAnterior != e.estadoNuevo)
             )
             // ⚠️ IMPORTANTE: devolver y rechazar exigen explicar el motivo.
             && (!(e.accion in ['devuelta', 'rechazada']) || e.comentario.size() > 0);
         }
 
-        // Notas y adjuntos: no cambian el estado.
-        function eventoSinCambioDeEstado(e) {
-          return e.accion in ['notaAgregada', 'adjuntoAgregado']
-            && e.estadoAnterior == null && e.estadoNuevo == null
+        // Notas y adjuntos no cambian el estado: los campos de estado van en null.
+        function sinDatosDeEstado(e) {
+          return e.estadoAnterior == null && e.estadoNuevo == null
             && e.etapaAnterior == null && e.etapaNueva == null
             && e.comentario.size() > 0;
         }
 
+        // Nota: la solicitud suma 1 nota en este lote, sin cambiar de estado.
+        function notaCoherente(e) {
+          return e.accion == 'notaAgregada'
+            && sinDatosDeEstado(e)
+            && exists(rutaSolicitud())
+            && esUltimoEvento()
+            && solicitudDespues().estadoActual == solicitudAntes().estadoActual
+            && solicitudDespues().cantidadNotas == solicitudAntes().cantidadNotas + 1;
+        }
+
+        // Adjunto: o se adjunta al crear la solicitud (mismo lote que "creada"),
+        // o la solicitud suma 1 adjunto en este lote, sin cambiar de estado.
+        function adjuntoCoherente(e) {
+          return e.accion == 'adjuntoAgregado'
+            && sinDatosDeEstado(e)
+            && (!exists(rutaSolicitud())
+                || (esUltimoEvento()
+                    && solicitudDespues().estadoActual == solicitudAntes().estadoActual
+                    && solicitudDespues().cantidadAdjuntos == solicitudAntes().cantidadAdjuntos + 1));
+        }
+
         allow create: if habilitado()
-          && request.auth.uid in getAfter(rutaSolicitud()).data.participantes
+          && request.auth.uid in solicitudDespues().participantes
           && eventoValido(request.resource.data)
           && (cambioDeEstadoCoherente(request.resource.data)
-              || eventoSinCambioDeEstado(request.resource.data));
+              || notaCoherente(request.resource.data)
+              || adjuntoCoherente(request.resource.data));
 
         // 📝 TRAZABILIDAD: el historial es append-only. Nadie lo edita ni lo borra.
         allow update, delete: if false;
@@ -394,6 +485,9 @@ service cloud.firestore {
         allow create: if habilitado()
           && request.auth.uid in getAfter(rutaSolicitud()).data.participantes
           && !(getAfter(rutaSolicitud()).data.estadoActual in estadosFinales())
+          // Se adjunta al crear la solicitud, o la solicitud suma 1 adjunto en este lote.
+          && (!exists(rutaSolicitud())
+              || getAfter(rutaSolicitud()).data.cantidadAdjuntos == get(rutaSolicitud()).data.cantidadAdjuntos + 1)
           && request.resource.data.keys().hasOnly(['nombreArchivo', 'tipoMime', 'tamanoBytes',
                                                    'contenidoBase64', 'subidoPor', 'subidoPorNombre',
                                                    'fechaSubida'])

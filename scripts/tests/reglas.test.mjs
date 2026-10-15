@@ -36,7 +36,12 @@ import {
   writeBatch,
   serverTimestamp,
   Timestamp,
+  setLogLevel,
 } from 'firebase/firestore';
+
+// Los rechazos esperados (assertFails) hacen que el SDK imprima PERMISSION_DENIED
+// en consola. Se silencian: el resultado de cada test ya informa si algo falla.
+setLogLevel('silent');
 
 // -------------------------------------------------------------
 // Datos de partida
@@ -51,6 +56,9 @@ const PERFILES = {
   otroSup: { nombre: 'Sofía Díaz', rol: 'supervisor', supervisorId: null, activo: true },
   inactivo: { nombre: 'Juan Baja', rol: 'iniciador', supervisorId: 'sup', activo: false },
 };
+
+/** Último número usado por el contador al empezar cada test. */
+const ULTIMO_NUMERO = 10;
 
 /** Solicitud en "enAprobacion" de "ini", asignada a su supervisor "sup". */
 function solicitudBase(cambios = {}) {
@@ -73,6 +81,7 @@ function solicitudBase(cambios = {}) {
     participantes: ['ini', 'sup'],
     cantidadAdjuntos: 0,
     cantidadNotas: 0,
+    ultimoEventoId: 'e1',
     fechaCreacion: Timestamp.now(),
     fechaActualizacion: Timestamp.now(),
     ...cambios,
@@ -109,6 +118,26 @@ const DEVOLVER = {
   etapaNueva: 'solicitud',
 };
 
+const REENVIAR = {
+  estadoAnterior: 'devuelta',
+  estadoNuevo: 'enAprobacion',
+  etapaAnterior: 'solicitud',
+  etapaNueva: 'aprobacion',
+};
+
+/** Datos de un adjunto válido de "tamanoBytes" bytes, subido por "ini". */
+function adjunto(tamanoBytes, tipoMime = 'application/pdf') {
+  return {
+    nombreArchivo: 'certificado.pdf',
+    tipoMime,
+    tamanoBytes,
+    contenidoBase64: 'A'.repeat(Math.ceil(tamanoBytes / 3) * 4),
+    subidoPor: 'ini',
+    subidoPorNombre: 'Ana Gómez',
+    fechaSubida: serverTimestamp(),
+  };
+}
+
 // -------------------------------------------------------------
 // Entorno de pruebas
 // -------------------------------------------------------------
@@ -143,7 +172,23 @@ beforeEach(async () => {
         fechaActualizacion: Timestamp.now(),
       });
     }
+    await setDoc(doc(db, 'contadores', 'solicitudes'), { ultimoNumero: ULTIMO_NUMERO });
+
     await setDoc(doc(db, 'solicitudes', 's1'), solicitudBase());
+    await setDoc(doc(db, 'solicitudes/s1/historial/e0'), { ...evento('ini', 'notaAgregada', {}, 'vieja'), fecha: Timestamp.now() });
+    await setDoc(doc(db, 'solicitudes/s1/historial/e1'), { ...evento('ini', 'creada'), fecha: Timestamp.now() });
+
+    await setDoc(
+      doc(db, 'solicitudes', 'devuelta1'),
+      solicitudBase({
+        numero: 'SOL-0004',
+        estadoActual: 'devuelta',
+        etapaActual: 'solicitud',
+        asignadoA: 'ini',
+        asignadoNombre: 'Ana Gómez',
+        rolAsignado: 'iniciador',
+      }),
+    );
     await setDoc(
       doc(db, 'solicitudes', 'ajena'),
       solicitudBase({
@@ -160,7 +205,6 @@ beforeEach(async () => {
       doc(db, 'solicitudes', 'deInactivo'),
       solicitudBase({ numero: 'SOL-0003', solicitanteId: 'inactivo', solicitanteNombre: 'Juan Baja', participantes: ['inactivo', 'sup'] }),
     );
-    await setDoc(doc(db, 'solicitudes/s1/historial/e1'), { ...evento('ini', 'creada'), fecha: Timestamp.now() });
   });
 });
 
@@ -205,6 +249,24 @@ describe('usuarios', () => {
 });
 
 // -------------------------------------------------------------
+// contadores
+// -------------------------------------------------------------
+
+describe('contadores', () => {
+  test('el contador no puede saltar números', async () => {
+    await assertFails(
+      updateDoc(doc(comoUsuario('ini'), 'contadores/solicitudes'), { ultimoNumero: ULTIMO_NUMERO + 2 }),
+    );
+  });
+
+  test('un supervisor no puede tocar el contador', async () => {
+    await assertFails(
+      updateDoc(doc(comoUsuario('sup'), 'contadores/solicitudes'), { ultimoNumero: ULTIMO_NUMERO + 1 }),
+    );
+  });
+});
+
+// -------------------------------------------------------------
 // solicitudes: lectura y consultas
 // -------------------------------------------------------------
 
@@ -240,28 +302,55 @@ describe('solicitudes: lectura', () => {
 // -------------------------------------------------------------
 
 describe('solicitudes: creación', () => {
-  /** Crea una solicitud y su evento "creada" en un mismo lote. */
-  async function crear(uid, cambios = {}) {
+  /**
+   * Crea una solicitud como lo hará la app: incrementa el contador, crea la
+   * solicitud, su evento "creada" y (opcional) adjuntos, todo en un mismo lote.
+   */
+  async function crear(uid, cambios = {}, opciones = {}) {
+    const { incrementarContador = true, adjuntos = [] } = opciones;
     const db = comoUsuario(uid);
     const referencia = doc(collection(db, 'solicitudes'));
+    const referenciaEvento = doc(collection(db, `solicitudes/${referencia.id}/historial`));
     const lote = writeBatch(db);
+    if (incrementarContador) {
+      lote.update(doc(db, 'contadores/solicitudes'), { ultimoNumero: ULTIMO_NUMERO + 1 });
+    }
     lote.set(
       referencia,
       solicitudBase({
+        numero: 'SOL-0011',
+        cantidadAdjuntos: adjuntos.length,
+        ultimoEventoId: referenciaEvento.id,
         fechaCreacion: serverTimestamp(),
         fechaActualizacion: serverTimestamp(),
         ...cambios,
       }),
     );
-    lote.set(
-      doc(collection(db, `solicitudes/${referencia.id}/historial`)),
-      evento(uid, 'creada', { estadoNuevo: 'enAprobacion', etapaNueva: 'aprobacion' }),
-    );
+    lote.set(referenciaEvento, evento(uid, 'creada', { estadoNuevo: 'enAprobacion', etapaNueva: 'aprobacion' }));
+    for (const datosAdjunto of adjuntos) {
+      lote.set(doc(collection(db, `solicitudes/${referencia.id}/adjuntos`)), datosAdjunto);
+      lote.set(
+        doc(collection(db, `solicitudes/${referencia.id}/historial`)),
+        evento(uid, 'adjuntoAgregado', {}, datosAdjunto.nombreArchivo),
+      );
+    }
     return lote.commit();
   }
 
   test('un iniciador crea una solicitud válida con su evento de historial', async () => {
     await assertSucceeds(crear('ini'));
+  });
+
+  test('no se puede crear sin incrementar el contador', async () => {
+    await assertFails(crear('ini', {}, { incrementarContador: false }));
+  });
+
+  test('el número tiene que ser el siguiente del contador', async () => {
+    await assertFails(crear('ini', { numero: 'SOL-0099' }));
+  });
+
+  test('ultimoEventoId tiene que apuntar al evento creado en el lote', async () => {
+    await assertFails(crear('ini', { ultimoEventoId: 'inventado' }));
   });
 
   test('no se puede asignar a otro que no sea su supervisor', async () => {
@@ -279,6 +368,19 @@ describe('solicitudes: creación', () => {
   test('no se puede crear directamente en otro estado', async () => {
     await assertFails(crear('ini', { estadoActual: 'enGestionRh', etapaActual: 'gestionRh' }));
   });
+
+  test('se puede crear con 3 adjuntos (el máximo al crear) en un mismo lote', async () => {
+    // Cada documento del lote evalúa reglas con get()/exists(): este caso verifica
+    // que el lote más grande que arma la app no supera los límites de Firestore.
+    const tres = [adjunto(600 * 1024), adjunto(600 * 1024), adjunto(600 * 1024)];
+    await assertSucceeds(crear('ini', { tipoPermiso: 'enfermedad', fechaFin: '2026-11-05', cantidadDias: 3 }, { adjuntos: tres }));
+  });
+
+  test('enfermedad exige adjunto: sin archivo se rechaza, con archivo se acepta', async () => {
+    const enfermedad = { tipoPermiso: 'enfermedad', fechaFin: '2026-11-05', cantidadDias: 3 };
+    await assertFails(crear('ini', enfermedad));
+    await assertSucceeds(crear('ini', enfermedad, { adjuntos: [adjunto(50_000)] }));
+  });
 });
 
 // -------------------------------------------------------------
@@ -286,12 +388,17 @@ describe('solicitudes: creación', () => {
 // -------------------------------------------------------------
 
 describe('solicitudes: transiciones', () => {
-  /** Actualiza s1 y agrega el evento del historial en un mismo lote. */
-  function transicion(uid, datos, eventoNuevo) {
+  /** Actualiza una solicitud y agrega el evento del historial en un mismo lote. */
+  function transicion(uid, datos, eventoNuevo, id = 's1') {
     const db = comoUsuario(uid);
+    const referenciaEvento = doc(collection(db, `solicitudes/${id}/historial`));
     const lote = writeBatch(db);
-    lote.update(doc(db, 'solicitudes/s1'), { ...datos, fechaActualizacion: serverTimestamp() });
-    lote.set(doc(collection(db, 'solicitudes/s1/historial')), eventoNuevo);
+    lote.update(doc(db, `solicitudes/${id}`), {
+      ultimoEventoId: referenciaEvento.id,
+      ...datos,
+      fechaActualizacion: serverTimestamp(),
+    });
+    lote.set(referenciaEvento, eventoNuevo);
     return lote.commit();
   }
 
@@ -305,14 +412,21 @@ describe('solicitudes: transiciones', () => {
     participantes: ['ini', 'sup', 'rh'],
   };
 
+  const datosReenviada = {
+    estadoActual: 'enAprobacion',
+    etapaActual: 'aprobacion',
+    asignadoA: 'sup',
+    asignadoNombre: 'Carlos Pérez',
+    rolAsignado: 'supervisor',
+    vistaPorAsignado: false,
+  };
+
   test('el supervisor asignado aprueba y queda asignada a RH', async () => {
     await assertSucceeds(transicion('sup', datosAprobada, evento('sup', 'aprobada', APROBAR)));
   });
 
   test('el iniciador no puede aprobar su propia solicitud', async () => {
-    await assertFails(
-      transicion('ini', { ...datosAprobada, participantes: ['ini', 'sup', 'rh'] }, evento('ini', 'aprobada', APROBAR)),
-    );
+    await assertFails(transicion('ini', datosAprobada, evento('ini', 'aprobada', APROBAR)));
   });
 
   test('al aprobar no se puede asignar a alguien que no es RH', async () => {
@@ -354,7 +468,20 @@ describe('solicitudes: transiciones', () => {
     );
   });
 
-  test('solo el asignado marca la solicitud como vista', async () => {
+  test('el solicitante corrige los datos al reenviar una solicitud devuelta', async () => {
+    await assertSucceeds(
+      transicion('ini', { ...datosReenviada, motivo: 'Viaje familiar (fechas corregidas)' }, evento('ini', 'reenviada', REENVIAR), 'devuelta1'),
+    );
+  });
+
+  test('los datos no se pueden editar fuera de un reenvío', async () => {
+    // Edita el motivo de una solicitud en aprobación, "justificándolo" con una nota.
+    await assertFails(
+      transicion('ini', { motivo: 'Otro motivo', cantidadNotas: 1 }, evento('ini', 'notaAgregada', {}, 'cambio')),
+    );
+  });
+
+  test('solo el asignado marca la solicitud como vista (sin evento)', async () => {
     const marcarVista = (uid) =>
       updateDoc(doc(comoUsuario(uid), 'solicitudes/s1'), {
         vistaPorAsignado: true,
@@ -370,21 +497,71 @@ describe('solicitudes: transiciones', () => {
 });
 
 // -------------------------------------------------------------
-// historial (trazabilidad)
+// trazabilidad: ningún cambio sin su evento
+// -------------------------------------------------------------
+
+describe('trazabilidad', () => {
+  const datosAprobada = {
+    estadoActual: 'enGestionRh',
+    etapaActual: 'gestionRh',
+    asignadoA: 'rh',
+    asignadoNombre: 'Laura Fernández',
+    rolAsignado: 'rh',
+    vistaPorAsignado: false,
+    participantes: ['ini', 'sup', 'rh'],
+    fechaActualizacion: serverTimestamp(),
+  };
+
+  test('no se puede cambiar el estado sin escribir el evento', async () => {
+    await assertFails(updateDoc(doc(comoUsuario('sup'), 'solicitudes/s1'), datosAprobada));
+  });
+
+  test('no se puede apuntar a un evento que ya existía', async () => {
+    await assertFails(updateDoc(doc(comoUsuario('sup'), 'solicitudes/s1'), { ...datosAprobada, ultimoEventoId: 'e0' }));
+  });
+
+  test('no se puede disfrazar un cambio de estado como una nota', async () => {
+    const db = comoUsuario('sup');
+    const referenciaEvento = doc(collection(db, 'solicitudes/s1/historial'));
+    const lote = writeBatch(db);
+    lote.update(doc(db, 'solicitudes/s1'), { ...datosAprobada, cantidadNotas: 1, ultimoEventoId: referenciaEvento.id });
+    lote.set(referenciaEvento, evento('sup', 'notaAgregada', {}, 'todo ok'));
+    await assertFails(lote.commit());
+  });
+});
+
+// -------------------------------------------------------------
+// historial (notas)
 // -------------------------------------------------------------
 
 describe('historial', () => {
-  test('un participante agrega una nota firmada por él', async () => {
-    const db = comoUsuario('ini');
+  /** Agrega una nota a s1 como lo hará la app (contador + evento + ultimoEventoId). */
+  function agregarNota(uid, eventoNota) {
+    const db = comoUsuario(uid);
+    const referenciaEvento = doc(collection(db, 'solicitudes/s1/historial'));
     const lote = writeBatch(db);
-    lote.update(doc(db, 'solicitudes/s1'), { cantidadNotas: 1, fechaActualizacion: serverTimestamp() });
-    lote.set(doc(collection(db, 'solicitudes/s1/historial')), evento('ini', 'notaAgregada', {}, 'Compenso el viernes'));
-    await assertSucceeds(lote.commit());
+    lote.update(doc(db, 'solicitudes/s1'), {
+      cantidadNotas: 1,
+      ultimoEventoId: referenciaEvento.id,
+      fechaActualizacion: serverTimestamp(),
+    });
+    lote.set(referenciaEvento, eventoNota);
+    return lote.commit();
+  }
+
+  test('un participante agrega una nota firmada por él', async () => {
+    await assertSucceeds(agregarNota('ini', evento('ini', 'notaAgregada', {}, 'Compenso el viernes')));
   });
 
   test('no se puede firmar un evento a nombre de otro usuario', async () => {
     const falso = { ...evento('ini', 'notaAgregada', {}, 'Hola'), usuarioId: 'sup', usuarioNombre: 'Carlos Pérez' };
-    await assertFails(setDoc(doc(comoUsuario('ini'), 'solicitudes/s1/historial/x'), falso));
+    await assertFails(agregarNota('ini', falso));
+  });
+
+  test('una nota suelta (sin actualizar la solicitud) se rechaza', async () => {
+    await assertFails(
+      setDoc(doc(comoUsuario('ini'), 'solicitudes/s1/historial/suelto'), evento('ini', 'notaAgregada', {}, 'Hola')),
+    );
   });
 
   test('el historial no se edita ni se borra (append-only)', async () => {
@@ -399,33 +576,34 @@ describe('historial', () => {
 // -------------------------------------------------------------
 
 describe('adjuntos', () => {
-  /** Sube un adjunto a s1 (con contador y evento) en un mismo lote. */
-  function subir(tamanoBytes, tipoMime = 'application/pdf') {
+  /** Sube un adjunto a s1 (contador + adjunto + evento) en un mismo lote. */
+  function subir(datosAdjunto, { sumarContador = true } = {}) {
     const db = comoUsuario('ini');
+    const referenciaEvento = doc(collection(db, 'solicitudes/s1/historial'));
     const lote = writeBatch(db);
-    lote.update(doc(db, 'solicitudes/s1'), { cantidadAdjuntos: 1, fechaActualizacion: serverTimestamp() });
-    lote.set(doc(collection(db, 'solicitudes/s1/adjuntos')), {
-      nombreArchivo: 'certificado.pdf',
-      tipoMime,
-      tamanoBytes,
-      contenidoBase64: 'A'.repeat(Math.ceil(tamanoBytes / 3) * 4),
-      subidoPor: 'ini',
-      subidoPorNombre: 'Ana Gómez',
-      fechaSubida: serverTimestamp(),
+    lote.update(doc(db, 'solicitudes/s1'), {
+      cantidadAdjuntos: sumarContador ? 1 : 0,
+      ultimoEventoId: referenciaEvento.id,
+      fechaActualizacion: serverTimestamp(),
     });
-    lote.set(doc(collection(db, 'solicitudes/s1/historial')), evento('ini', 'adjuntoAgregado', {}, 'certificado.pdf'));
+    lote.set(doc(collection(db, 'solicitudes/s1/adjuntos')), datosAdjunto);
+    lote.set(referenciaEvento, evento('ini', 'adjuntoAgregado', {}, datosAdjunto.nombreArchivo));
     return lote.commit();
   }
 
   test('se acepta un PDF de 600 KB (el máximo)', async () => {
-    await assertSucceeds(subir(600 * 1024));
+    await assertSucceeds(subir(adjunto(600 * 1024)));
   });
 
   test('se rechaza un archivo de 700 KB', async () => {
-    await assertFails(subir(700 * 1024));
+    await assertFails(subir(adjunto(700 * 1024)));
   });
 
   test('se rechaza un tipo de archivo no permitido', async () => {
-    await assertFails(subir(1000, 'application/x-msdownload'));
+    await assertFails(subir(adjunto(1000, 'application/x-msdownload')));
+  });
+
+  test('un adjunto sin sumar el contador de la solicitud se rechaza', async () => {
+    await assertFails(subir(adjunto(1000), { sumarContador: false }));
   });
 });

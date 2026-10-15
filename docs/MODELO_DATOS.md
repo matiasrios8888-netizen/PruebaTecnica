@@ -11,6 +11,7 @@ Convenciones del proyecto:
 ```
 usuarios/{uid}
 roles/{clave}
+contadores/solicitudes
 solicitudes/{id}
   ├── historial/{eventoId}
   └── adjuntos/{adjuntoId}
@@ -66,6 +67,18 @@ Catálogo de roles para la gestión de roles (Fase 4). El id del documento es la
 }
 ```
 
+## 2.b `contadores/solicitudes`
+
+Último número correlativo usado. Al crear una solicitud, la app lee el contador, le suma 1 y guarda en una misma **transacción** el contador, la solicitud (con `numero: "SOL-0011"`), su evento `creada` y sus adjuntos. Si dos personas crean al mismo tiempo, Firestore reintenta una de las transacciones, así que el número nunca se repite. Las reglas exigen que el contador suba exactamente 1 y que el `numero` coincida (4 dígitos, hasta `SOL-9999`).
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `ultimoNumero` | number | Último número asignado. Lo inicializa el script de datos de prueba. |
+
+```json
+{ "ultimoNumero": 10 }
+```
+
 ## 3. Tipos de permiso (no es una colección)
 
 Viven en `CONFIG_TIPOS_PERMISO` dentro de `constantes.js` porque son reglas de negocio fijas.
@@ -103,6 +116,7 @@ El trámite. Algunos datos están **desnormalizados** (copiados), como `solicita
 | `participantes` | string[] | uids de todos los que intervinieron (pestaña **Enviadas**). |
 | `cantidadAdjuntos` | number | Contador para mostrar en la bandeja sin leer la subcolección. |
 | `cantidadNotas` | number | Ídem para notas. |
+| `ultimoEventoId` | string | Id del último evento del historial. Todo cambio (salvo marcarla como vista) debe apuntar a un evento creado en el mismo lote. |
 | `fechaCreacion` | Timestamp | |
 | `fechaActualizacion` | Timestamp | Se usa para ordenar la bandeja. |
 
@@ -126,6 +140,7 @@ El trámite. Algunos datos están **desnormalizados** (copiados), como `solicita
   "participantes": ["uidIniciador", "uidSupervisor"],
   "cantidadAdjuntos": 0,
   "cantidadNotas": 0,
+  "ultimoEventoId": "Xb3kP9qL2mN7",
   "fechaCreacion": "<Timestamp>",
   "fechaActualizacion": "<Timestamp>"
 }
@@ -144,7 +159,13 @@ El trámite. Algunos datos están **desnormalizados** (copiados), como `solicita
 | rechazarRh | `enGestionRh` | `rechazada` / `finalizada` | RH asignado (comentario obligatorio) |
 | cancelar | `enAprobacion`, `devuelta` | `cancelada` / `finalizada` | iniciador (solicitante) |
 
-Asignación: al crear o reenviar → el supervisor del solicitante. Al aprobar → el usuario RH activo con menos pendientes. Al devolver → el solicitante. En los estados finales → `null`.
+Asignación:
+- Al crear o reenviar → el supervisor del solicitante.
+- Al aprobar → un usuario RH activo, por **reparto rotativo** según el número: los RH activos se ordenan y se toma el que está en la posición `número % cantidad de RH`.
+- Al devolver → el solicitante.
+- En los estados finales → `null`.
+
+**Trazabilidad en las dos direcciones:** todo cambio de la solicitud (estado, nota, adjunto, datos) apunta en `ultimoEventoId` a un evento creado en el mismo lote, y cada evento tiene que coincidir con el cambio real de la solicitud. La única excepción es marcarla como vista (`vistaPorAsignado`), que no es una acción sobre el trámite.
 
 ## 5. `solicitudes/{id}/historial/{eventoId}`
 

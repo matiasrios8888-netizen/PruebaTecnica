@@ -186,3 +186,220 @@ Registro paso a paso de lo que se construyó. Las decisiones técnicas important
 ## Resumen de la Fase 1
 
 Armamos la base de una app de permisos con arquitectura en capas (UI → servicios → repositorios → Firebase), en JavaScript vanilla y con el SDK de Firebase desde el CDN, para que se publique como sitio estático. Diseñamos el modelo de datos en Firestore pensando en las consultas: cada solicitud tiene etapa y estado, a quién está asignada y quiénes participaron, y un historial append-only en una subcolección. Las reglas del flujo viven en una tabla de transiciones centralizada que usan la app, el script de datos de prueba y, replicada, las reglas de seguridad. El login valida perfil y estado activo, y un script con firebase-admin carga 4 usuarios y 10 solicitudes con historial coherente. La seguridad se aplica en el servidor con `firestore.rules` (rol, transiciones válidas, historial firmado con la hora del servidor, adjuntos de hasta 600 KB) y está cubierta por 30 tests automáticos contra el emulador, que detectaron un error antes de publicar.
+
+---
+
+## 2026-10-15 – Fase 2 – Paso: contador, ultimoEventoId y reparto RH
+
+- **Qué hicimos:** creamos la rama `feature/flujo-aprobacion` y ajustamos el modelo antes de construir el flujo:
+  - un contador para numerar las solicitudes sin repetir;
+  - el campo `ultimoEventoId`, para que las reglas exijan que **todo** cambio de una solicitud deje su evento en el historial;
+  - un reparto rotativo de las tareas entre los usuarios RH.
+
+  Actualizamos las reglas, los tests (de 30 a 43), el script de datos, la documentación y DECISIONES.md. Publicamos las reglas y recargamos los datos.
+- **Archivos creados o modificados:**
+  - `src/config/constantes.js`: colección `contadores` y `NUMERACION_SOLICITUD` (prefijo `SOL-`, 4 dígitos).
+  - `src/data/modelos.js`: campo `ultimoEventoId` en Solicitud y el `@typedef` Contador.
+  - `firestore.rules`:
+    - reglas de `contadores` (solo sube de a 1);
+    - número correlativo verificado al crear;
+    - supervisor activo;
+    - adjunto obligatorio según el tipo;
+    - datos del permiso editables solo al reenviar;
+    - trazabilidad en las dos direcciones (`ultimoEventoId` ↔ evento).
+  - `scripts/tests/reglas.test.mjs`: 13 tests nuevos (contador, trazabilidad, reenvío con corrección, adjunto obligatorio); los logs de rechazos esperados quedan silenciados.
+  - `scripts/seed.mjs`: guarda `ultimoEventoId` en cada solicitud y deja el contador en 10.
+  - `docs/MODELO_DATOS.md`: colección `contadores`, campo `ultimoEventoId`, reparto rotativo y trazabilidad.
+  - `DECISIONES.md`: corrección de la decisión 8 (reparto rotativo), ampliación de la 9 (trazabilidad en las dos direcciones) y decisión 18 (contador con transacción).
+- **Conceptos aprendidos:**
+  - **Transacción:** lee y escribe como una sola operación. Si lo que se leyó cambió antes de escribir, Firestore la reintenta. Por eso dos solicitudes creadas al mismo tiempo nunca reciben el mismo número.
+  - **`existsAfter` + `!exists`:** juntos significan "este documento se crea en esta misma operación". Con eso las reglas comprueban que el evento del historial es nuevo y no uno viejo reutilizado.
+  - **Trazabilidad en las dos direcciones:** la solicitud apunta a su último evento, y el evento tiene que coincidir con el cambio de la solicitud. Ninguno de los dos se puede escribir sin el otro.
+  - **Límite de las reglas (las reglas no son filtros):** "asignar al RH con menos pendientes" exigiría que el supervisor lea tareas ajenas, así que se cambió por un reparto rotativo que no necesita leer nada.
+- **Comandos usados:**
+  - `git switch -c feature/flujo-aprobacion` y `git push -u origin feature/flujo-aprobacion`: crear y publicar la rama de la Fase 2.
+  - `npm run test:reglas`: 43 tests, todos en verde.
+  - `npm run seed:simular` y `npm run seed`: validar y recargar los datos de prueba.
+  - `firebase deploy --only firestore:rules`: publicar las reglas nuevas.
+- **Cómo probarlo:**
+  1. `cd scripts` y después `npm run test:reglas` → `pass 43`, `fail 0`.
+  2. En la consola de Firebase: existe `contadores/solicitudes` con `ultimoNumero: 10`, y cada solicitud tiene `ultimoEventoId`, que coincide con el id de un documento de su `historial`.
+  3. El login sigue funcionando con los 4 usuarios.
+- **Pendientes o dudas:** el seed todavía asigna RH con su propia lógica; en el próximo paso pasa a usar el módulo compartido `flujoSolicitud.js`.
+
+---
+
+## 2026-10-15 – Fase 2 – Paso: lógica pura del flujo (flujoSolicitud.js)
+
+- **Qué hicimos:** escribimos el módulo que **interpreta** la tabla de transiciones: qué acciones puede hacer cada usuario sobre una solicitud, qué cambia al ejecutarlas, a quién se asigna la tarea (con el reparto rotativo de RH) y las validaciones de datos, notas y adjuntos. Es puro, es decir, no usa Firebase, así que lo probamos con 28 tests unitarios. Además, el script de datos de prueba dejó su propia copia de la lógica y ahora usa este mismo módulo.
+- **Archivos creados o modificados:**
+  - `src/services/flujoSolicitud.js`:
+    - `accionesDisponibles`, `calcularTransicion`, `elegirUsuarioRh`;
+    - `validarDatosSolicitud`, `validarArchivoAdjunto`, `validarComentario`;
+    - `construirEventoNota`, `construirEventoAdjunto`;
+    - `calcularCantidadDias`, `formatearNumeroSolicitud`.
+  - `scripts/tests/flujoSolicitud.test.mjs`: 28 tests unitarios del módulo.
+  - `scripts/seed.mjs`: `construirSolicitud` ahora usa `flujoSolicitud.js` (misma lógica que la app). La simulación da exactamente el mismo resultado que antes.
+  - `scripts/package.json`: comandos `npm test` (todo) y `npm run test:flujo`.
+  - `README.md`: tabla de comandos de tests.
+- **Conceptos aprendidos:**
+  - **Función pura:** con los mismos datos de entrada devuelve siempre el mismo resultado y no toca nada externo (base de datos, pantalla, reloj). Es la parte más fácil de testear y de reutilizar.
+  - **Test unitario:** prueba una función aislada, en milisegundos y sin servicios externos. Los tests de reglas, en cambio, son de integración: necesitan el emulador.
+  - **Una sola fuente de lógica:** la app y el seed llaman a `calcularTransicion`, así que no pueden "pensar distinto" sobre el flujo.
+  - **Fechas en UTC:** para contar días se usa `Date.UTC`, así un cambio de horario de verano no hace que un día "dure" 23 o 25 horas. Además se detectan fechas imposibles (30 de febrero).
+- **Comandos usados:**
+  - `npm run test:flujo`: 28 tests en ~0,1 s.
+  - `npm test`: corre las dos suites (71 tests).
+  - `npm run seed:simular`: confirma que el seed refactorizado produce los mismos datos.
+- **Cómo probarlo:**
+  1. `cd scripts` y después `npm test` → `pass 28` y `pass 43`.
+  2. `npm run seed:simular` → la misma tabla de 10 solicitudes que antes.
+- **Pendientes o dudas:** el módulo todavía no lo usa ninguna pantalla; lo usa el servicio de solicitudes en el próximo paso.
+
+---
+
+## 2026-10-15 – Fase 2 – Paso: repositorio y servicio de solicitudes
+
+- **Qué hicimos:** conectamos la lógica del flujo con Firestore.
+  - **Repositorio:** sabe *cómo* guardar (transacciones, ids, hora del servidor, enlace `ultimoEventoId`), pero no decide nada.
+  - **Servicio:** decide *qué* guardar usando `flujoSolicitud.js`. Casos de uso: crear (con número correlativo y adjuntos), ver el detalle, ejecutar acciones del flujo, agregar notas y adjuntos, y listar las tareas y solicitudes del usuario.
+
+  Lo probamos contra el proyecto real con un recorrido completo de 3 roles.
+- **Archivos creados o modificados:**
+  - `src/data/solicitudesRepositorio.js`: lecturas (solicitud, historial, adjuntos, asignadas, donde participa) y escrituras con transacción (`crearConNumero`, `actualizarConEvento`), más `marcarComoVista`.
+  - `src/services/solicitudesServicio.js`: `crearSolicitud`, `obtenerDetalle`, `listarInicio`, `ejecutarAccion`, `agregarNota`, `agregarAdjunto`.
+  - `src/services/archivos.js`: convertir archivos del navegador a base64 y de base64 a una URL para abrirlos.
+  - `src/services/errores.js`: `aErrorAplicacion()` traduce los errores de Firestore (`permission-denied`, `unavailable`…) a mensajes en español.
+  - `src/data/usuariosRepositorio.js`: `listarUsuariosPorRol()` (para el reparto RH).
+  - `src/config/firebase.js`: reexporta las funciones de Firestore que se usan ahora.
+  - `src/config/constantes.js`: `LIMITES_ADJUNTO.maximoAlCrear = 3`.
+  - `scripts/tests/reglas.test.mjs`: test de creación con 3 adjuntos de 600 KB (44 tests).
+- **Conceptos aprendidos:**
+  - **Función "armar" (inversión de control):** el repositorio abre la transacción y lee los datos frescos, pero quien decide qué escribir es el servicio. Así el repositorio no conoce reglas de negocio y el servicio no conoce detalles de Firestore.
+  - **Transacción y concurrencia:** cada acción se valida con la solicitud leída dentro de la transacción. Si dos personas actúan a la vez, la segunda ve el estado ya cambiado y recibe un error claro, en lugar de pisar el trabajo de la primera.
+  - **Validar antes de convertir:** el tamaño del archivo se controla antes de pasarlo a base64, que lo agranda un 33 %.
+  - **Mensajes al usuario vs. detalle técnico:** el usuario ve "No tenés permiso…"; el error original queda en la consola para quien depure.
+- **Comandos usados:**
+  - `npm run test:reglas`: 44 tests.
+  - Prueba de integración en el navegador (Playwright) contra el proyecto real: Ana crea `SOL-0011` y agrega una nota → Carlos intenta devolver sin comentario (rechazado) y devuelve con comentario → Ana corrige las fechas y reenvía → Carlos aprueba → Laura adjunta un PDF (un archivo de 700 KB y un .exe fueron rechazados) y completa. El historial quedó con los 7 eventos en orden.
+- **Cómo probarlo:** las pantallas llegan en los próximos pasos. Mientras tanto, con la app abierta y logueado, en la consola del navegador (F12):
+  ```js
+  const srv = await import('/src/services/solicitudesServicio.js');
+  await srv.listarInicio();
+  ```
+- **Pendientes o dudas:** la prueba de integración dejó `SOL-0011` en la base; al cerrar la fase se recargan los datos de prueba.
+
+---
+
+## 2026-10-15 – Fase 2 – Paso: router con parámetros, marco y pantalla Nueva solicitud
+
+- **Qué hicimos:**
+  - El router ahora entiende rutas con parámetros (`#/solicitudes/:id`) y rutas restringidas por rol.
+  - Creamos un marco común para las pantallas privadas: encabezado, navegación según el rol y botón Salir.
+  - Construimos el formulario de **Nueva solicitud**. Muestra pistas en vivo (días máximos, si el tipo exige adjunto, cantidad de días), adjunta archivos y crea la solicitud con un aviso de confirmación.
+- **Archivos creados o modificados:**
+  - `src/ui/router.js`: patrones con parámetros, prioridad de rutas fijas sobre rutas con parámetros, opción `roles`, `rutaDetalle(id)` y `recargarPantalla()`.
+  - `src/ui/componentes/marco.js`: encabezado y navegación comunes. El enlace "Nueva solicitud" solo aparece para el iniciador.
+  - `src/ui/pantallas/nuevaSolicitudPantalla.js`: formulario de creación.
+  - `src/ui/pantallas/inicioPantalla.js`: usa el marco y ofrece "Nueva solicitud" al iniciador.
+  - `src/ui/pantallas/loginPantalla.js`: usa la clase de diseño de las pantallas públicas.
+  - `src/ui/utils/formato.js`: fechas, tamaños, nombres de estados, tipos y roles, y colores de las etiquetas de estado.
+  - `src/ui/utils/avisos.js`: avisos flotantes ("Solicitud SOL-0012 enviada…").
+  - `src/styles/main.css`: estilos del marco, formularios, botones, etiquetas, tablas e historial.
+  - `src/main.js`: registra la ruta de nueva solicitud, restringida al rol iniciador.
+- **Conceptos aprendidos:**
+  - **Ruta con parámetros:** el patrón `#/solicitudes/:id` coincide con `#/solicitudes/abc123` y entrega `{ id: 'abc123' }` a la pantalla.
+  - **Prioridad de rutas:** `#/solicitudes/nueva` también encaja en `#/solicitudes/:id`. Por eso las rutas fijas se prueban primero.
+  - **Componente reutilizable:** `dibujarMarco()` evita repetir el encabezado en cada pantalla.
+  - **Caché del navegador:** el navegador guarda los archivos JS. Si después de un cambio no se ve lo nuevo, hay que recargar con **Ctrl + F5**. Live Server lo hace solo al guardar.
+- **Comandos usados:**
+  - Prueba en el navegador (Playwright):
+    - un supervisor no ve "Nueva solicitud" y, si escribe la URL, vuelve al inicio;
+    - el formulario vacío muestra "Elegí un tipo de permiso.";
+    - Enfermedad sin certificado se rechaza;
+    - con el PDF adjunto se crea `SOL-0012`;
+    - no hubo errores en la consola.
+- **Cómo probarlo:**
+  1. Live Server → entrá como `iniciador@bprosys.test`.
+  2. **Nueva solicitud** → probá elegir Enfermedad sin adjuntar nada (error) y después con un PDF chico (se crea).
+  3. Entrá como `supervisor@bprosys.test`: no vas a ver "Nueva solicitud" en el menú.
+- **Pendientes o dudas:** al crear, la app vuelve al inicio porque la pantalla de detalle se construye en el próximo paso.
+
+---
+
+## 2026-10-15 – Fase 2 – Paso: pantalla de detalle de la solicitud
+
+- **Qué hicimos:** construimos el detalle del trámite, donde ocurre todo el flujo. Muestra:
+  - la etapa en una barra de progreso y a quién está esperando;
+  - los datos del permiso (editables solo para quien puede corregirlos);
+  - un botón por cada acción permitida, con un comentario que queda en el historial;
+  - formularios para agregar notas y adjuntos;
+  - los adjuntos, que se pueden abrir;
+  - la línea de tiempo completa del historial.
+
+  Al crear una solicitud, la app ahora abre directamente su detalle.
+- **Archivos creados o modificados:**
+  - `src/ui/pantallas/detalleSolicitudPantalla.js`: la pantalla. No decide permisos: muestra lo que devuelve el servicio (`acciones`, `puedeCorregirDatos`, `puedeAgregarSeguimiento`).
+  - `src/config/constantes.js`: `NOMBRES_ACCION` (texto de cada botón).
+  - `src/services/solicitudesServicio.js`: mensaje único "La solicitud no existe o no tenés permiso para verla".
+  - `src/services/errores.js`: el detalle técnico de los errores va a la consola como advertencia.
+  - `src/styles/main.css`: clases del detalle (etapas, columnas, mensaje de alerta, texto para lectores de pantalla). La pantalla no usa estilos escritos dentro del HTML.
+  - `src/main.js`: registra la ruta `#/solicitudes/:id`.
+- **Conceptos aprendidos:**
+  - **Control de campos por rol:** los datos del permiso se dibujan como campos deshabilitados. Solo se habilitan para la solicitante cuando le devolvieron la solicitud, y se guardan al "Reenviar corregida". Lo decide `puedeCorregirDatos` (flujoSolicitud.js) y lo vuelven a exigir las reglas.
+  - **La UI muestra, el servicio decide:** la pantalla no tiene ningún `if (rol === ...)`: dibuja un botón por cada acción que le devuelve el servicio.
+  - **No revelar si algo existe:** ante un id inexistente o ajeno se muestra el mismo mensaje, igual que hace Firestore.
+  - **URL temporal (`blob:`):** los adjuntos guardados en base64 se convierten en un archivo en memoria para abrirlos en otra pestaña. Después se libera con `URL.revokeObjectURL`.
+  - **Confirmación antes de acciones irreversibles:** rechazar y cancelar piden confirmación.
+- **Comandos usados:**
+  - Prueba en el navegador (Playwright) **haciendo clic como cada usuario**:
+    1. Ana crea y agrega una nota.
+    2. Carlos intenta devolver sin comentario (error) y después devuelve.
+    3. Ana ve los campos habilitados, corrige las fechas a enero y reenvía (5 días).
+    4. Carlos aprueba → queda "Esperando a Laura Fernández".
+    5. Laura adjunta un PDF, lo abre en otra pestaña y completa.
+    6. Ana ve el trámite finalizado, sin acciones ni notas, con 7 eventos en el historial.
+
+    Un id inexistente muestra el mensaje genérico.
+- **Cómo probarlo:**
+  1. Live Server (si no ves los cambios: **Ctrl + F5**).
+  2. Como `iniciador@bprosys.test` → **Nueva solicitud** → al enviarla se abre su detalle.
+  3. Copiá la URL. Salí, entrá como `supervisor@bprosys.test`, pegá la URL y probá **Devolver** sin comentario (error) y con comentario.
+  4. Volvé como iniciador: los campos ahora se pueden editar → **Reenviar corregida**.
+  5. Supervisor → **Aprobar**; `rh@bprosys.test` → adjuntá un archivo → **Completar gestión**.
+- **Pendientes o dudas:** por ahora a una solicitud se llega por su URL; en el próximo paso el inicio lista las tareas y solicitudes del usuario.
+
+---
+
+## 2026-10-15 – Fase 2 – Paso: inicio con tareas y solicitudes, prueba final y cierre
+
+- **Qué hicimos:** el inicio muestra dos listas, "Mis tareas pendientes" (con la marca **Nueva** hasta que el asignado la abre) y "Mis solicitudes". Cada fila abre el detalle. Recargamos los datos de prueba, corrimos los 72 tests, probamos el inicio con los 4 roles, documentamos las decisiones de la fase y cerramos la fase con el merge a `main`.
+- **Archivos creados o modificados:**
+  - `src/ui/pantallas/inicioPantalla.js`: listas de tareas y solicitudes con estado, asignado y fecha de actualización.
+  - `README.md`: estado de las fases, qué puede hacer cada rol y estructura actualizada.
+  - `DECISIONES.md`: 19 (lógica pura compartida), 20 (transacciones con función "armar") y 21 (un único mensaje para "no existe" y "sin permiso").
+- **Conceptos aprendidos:**
+  - **"Nueva" sin campos extra:** se calcula con `asignadoA == yo` y `vistaPorAsignado == false`. Al abrir el detalle se marca como vista, y es el único cambio que no deja evento, porque no es una acción sobre el trámite.
+  - **Orden en el cliente:** por ahora las listas se ordenan en el navegador. En la Fase 3 la bandeja ordena y filtra con consultas e índices compuestos de Firestore.
+- **Comandos usados:**
+  - `npm run seed`: recargar los datos de prueba (borra las solicitudes creadas por las pruebas).
+  - `npm test`: 28 tests de lógica + 44 de reglas, todos en verde.
+  - Prueba en el navegador:
+    - supervisor: 3 tareas (2 nuevas); al abrir `SOL-0001` deja de ser nueva;
+    - RH: 3 tareas (2 nuevas);
+    - iniciadora: 1 tarea (`SOL-0004` devuelta);
+    - admin: sin tareas.
+  - `git merge --no-ff feature/flujo-aprobacion`: integra la fase a `main`.
+- **Cómo probarlo:**
+  1. Live Server → entrá con cada usuario y mirá "Mis tareas pendientes".
+  2. Como supervisor, abrí `SOL-0001` (dice **Nueva**) y volvé al inicio: ya no lo dice.
+  3. Recorré el flujo completo como se describe en el paso anterior.
+- **Pendientes o dudas:**
+  - Durante una prueba apareció una vez un error `400` en la consola al cerrar sesión mientras cargaban las listas; no se reprodujo al repetirlo (probablemente la conexión de Firestore cortándose a mitad de la carga). Queda en observación.
+  - El admin y RH todavía no tienen una vista de "todas las solicitudes": llega con la bandeja de la Fase 3.
+
+---
+
+## Resumen de la Fase 2
+
+Construimos el flujo completo Solicitar → Aprobar → Gestionar RH de punta a punta: crear con adjuntos, devolver con motivo, corregir y reenviar, aprobar, completar o rechazar, notas e historial. La lógica del flujo vive en un módulo puro (`flujoSolicitud.js`) que interpreta la tabla de transiciones. Lo usan la app y el script de datos de prueba, y lo cubren 28 tests unitarios. Las escrituras son transacciones que validan contra el estado real del trámite, con número correlativo sin repeticiones. Reforzamos las reglas para que la trazabilidad sea obligatoria en las dos direcciones: ningún cambio se guarda sin su evento en el historial, y ningún evento puede mentir sobre el cambio (44 tests contra el emulador). En la interfaz, la pantalla de detalle no decide permisos: muestra un botón por cada acción que el servicio habilita y bloquea los campos según el rol y el estado.

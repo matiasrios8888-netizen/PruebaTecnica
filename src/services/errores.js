@@ -30,3 +30,28 @@ export class ErrorAplicacion extends Error {
     this.causa = causa;
   }
 }
+
+/** Mensajes en español para los códigos de error de Firestore más comunes. */
+const MENSAJES_ERROR_FIRESTORE = {
+  'permission-denied':
+    'No tenés permiso para realizar esta acción. Puede que la solicitud haya cambiado: recargá la página.',
+  unavailable: 'No hay conexión con el servidor. Revisá tu internet y volvé a intentar.',
+  'deadline-exceeded': 'El servidor tardó demasiado en responder. Volvé a intentar.',
+  aborted: 'Otra persona modificó la solicitud al mismo tiempo. Volvé a intentar.',
+  'resource-exhausted': 'Se alcanzó un límite del servidor. Esperá unos minutos y volvé a intentar.',
+  'invalid-argument': 'Los datos enviados no son válidos (por ejemplo, un archivo demasiado grande).',
+};
+
+/**
+ * Convierte cualquier error en un ErrorAplicacion con mensaje para el usuario.
+ * Los ErrorAplicacion (validaciones del negocio) pasan tal cual.
+ * @param {unknown} error
+ * @param {string} [mensajePorDefecto]
+ * @returns {ErrorAplicacion}
+ */
+export function aErrorAplicacion(error, mensajePorDefecto = 'Ocurrió un error inesperado. Volvé a intentar.') {
+  if (error instanceof ErrorAplicacion) return error;
+  const codigo = error?.code ?? 'desconocido';
+  console.warn('[errores]', codigo, error); // detalle técnico solo en consola, para depurar
+  return new ErrorAplicacion(MENSAJES_ERROR_FIRESTORE[codigo] ?? mensajePorDefecto, codigo, error);
+}

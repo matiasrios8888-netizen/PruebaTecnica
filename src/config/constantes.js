@@ -25,6 +25,19 @@ export const COLECCIONES = Object.freeze({
   SOLICITUDES: 'solicitudes',
   HISTORIAL: 'historial', // subcolección de cada solicitud
   ADJUNTOS: 'adjuntos', // subcolección de cada solicitud
+  CONTADORES: 'contadores',
+});
+
+/**
+ * Numeración correlativa de las solicitudes ("SOL-0001").
+ * El último número usado vive en contadores/{ID_CONTADOR}.ultimoNumero y se
+ * incrementa dentro de una transacción al crear cada solicitud.
+ * 🔒 SEGURIDAD: firestore.rules exige que el número tenga 4 dígitos (hasta SOL-9999).
+ */
+export const NUMERACION_SOLICITUD = Object.freeze({
+  ID_CONTADOR: 'solicitudes',
+  PREFIJO: 'SOL-',
+  DIGITOS: 4,
 });
 
 // -------------------------------------------------------------
@@ -181,6 +194,18 @@ export const ACCIONES = Object.freeze({
   CANCELAR: 'cancelar',
 });
 
+/** Texto del botón de cada acción en la pantalla de detalle. */
+export const NOMBRES_ACCION = Object.freeze({
+  [ACCIONES.CREAR]: 'Crear solicitud',
+  [ACCIONES.APROBAR]: 'Aprobar',
+  [ACCIONES.DEVOLVER]: 'Devolver para corregir',
+  [ACCIONES.REENVIAR]: 'Reenviar corregida',
+  [ACCIONES.RECHAZAR]: 'Rechazar',
+  [ACCIONES.COMPLETAR]: 'Completar gestión',
+  [ACCIONES.RECHAZAR_RH]: 'Rechazar en RH',
+  [ACCIONES.CANCELAR]: 'Cancelar solicitud',
+});
+
 /**
  * Quién puede ejecutar una acción, además de tener el rol requerido:
  *   - ASIGNADO: el usuario que figura en "asignadoA" de la solicitud.
@@ -327,4 +352,7 @@ export const LIMITES_ADJUNTO = Object.freeze({
   tamanoMaximoBytes: 600 * 1024, // 614.400
   longitudMaximaBase64: Math.ceil((600 * 1024) / 3) * 4, // 819.200
   tiposMimePermitidos: Object.freeze(['application/pdf', 'image/jpeg', 'image/png']),
+  // Archivos que se pueden adjuntar al crear la solicitud (todos viajan en una sola
+  // transacción; Firestore limita cada operación a 10 MiB).
+  maximoAlCrear: 3,
 });
