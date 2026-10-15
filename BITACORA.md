@@ -648,3 +648,28 @@ Construimos el flujo completo Solicitar → Aprobar → Gestionar RH de punta a 
 ## Resumen de la Fase 3
 
 Construimos la bandeja de tareas: pestañas Pendientes, Nuevas y Enviadas (y Todas para RH y admin) con contadores, búsqueda sin tildes ni mayúsculas, filtros por estado, etapa, tipo y rango de fechas, y orden. Cada pestaña es una consulta a Firestore con su índice compuesto, y filtrar y buscar ocurre en el navegador con lógica pura y testeada. El control de campos por rol pasó a ser una matriz de configuración que decide, campo por campo, quién edita y quién ve según el rol y el estado. La sumamos con los datos de gestión RH, que solo carga el RH asignado al completar, y las reglas de Firestore exigen lo mismo. Durante la fase detectamos dos bugs en código ya publicado (el seed cerraba sesiones y desbordes de diseño). Los corregimos cada uno en su propia rama desde `main`, con tests de regresión, y los integramos a la fase resolviendo los conflictos de merge. Terminamos con 106 tests automáticos en verde y 0 bugs abiertos.
+
+## 2026-10-15 – Fase 4 – Corrección: BUG-008 (avisos que quedaban después de cerrar sesión)
+
+- **Qué hicimos:** en la prueba integral de la Fase 4 apareció un aviso de la sesión anterior ("SOL-0011: Completar gestión ✔") en la sesión del admin. El código de los avisos es de la Fase 2, que ya está en `main`, así que seguimos el flujo de BUGS.md:
+  1. registrar el bug;
+  2. crear una rama desde `main`;
+  3. corregir;
+  4. testear;
+  5. integrar a `main`.
+
+  Al cerrar sesión ahora se borran los avisos pendientes.
+- **Archivos creados o modificados:**
+  - `src/ui/utils/avisos.js`: nueva función `limpiarAvisos()`.
+  - `src/main.js`: la llama cuando no hay sesión.
+  - `BUGS.md`: BUG-008.
+- **Conceptos aprendidos:**
+  - **Elementos fuera de la pantalla:** la zona de avisos vive en el `<body>`, fuera del contenedor que se redibuja. Por eso sobrevive al cambio de pantalla, que es lo que se busca. La contracara es que hay que limpiarla a mano cuando el cambio es de usuario y no solo de pantalla.
+  - **Por qué se corrige en una rama aparte:** `main` es lo que se publica. La corrección se prueba en su rama y recién después se integra, sin mezclarla con el trabajo de la Fase 4, que todavía no terminó.
+- **Comandos usados:**
+  - `git switch main` + `git pull` + `git switch -c fix/BUG-008-avisos-entre-sesiones`.
+  - `npm test`: 54 + 52 en verde.
+  - Prueba en el navegador: nota → "Salir" inmediato → el login sin avisos; al volver a entrar, los avisos siguen funcionando.
+  - `git merge --no-ff` a `main` y `git push`.
+- **Cómo probarlo:** agregar una nota y apretar "Salir" enseguida. El aviso "Nota agregada" no tiene que quedar en la pantalla de login.
+- **Pendientes o dudas:** traer la corrección a `feature/mantenimiento` (`git merge main`) antes de cerrar la Fase 4.
