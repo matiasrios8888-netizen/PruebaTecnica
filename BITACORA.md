@@ -453,3 +453,25 @@ Construimos el flujo completo Solicitar → Aprobar → Gestionar RH de punta a 
   - `git merge --no-ff docs/proceso-correccion-bugs`: integra el cambio a `main`.
 - **Cómo probarlo:** leer la sección "Registro de bugs" de `CLAUDE.md` y "Cómo se usa" de `BUGS.md`.
 - **Pendientes o dudas:** ninguno. Siguiente: aprobación del plan de la Fase 3.
+
+---
+
+## 2026-10-15 – Corrección – BUG-006: recargar los datos de prueba cerraba las sesiones
+
+- **Qué hicimos:** primer bug corregido con el flujo **Detectar → Ramificar → Corregir → Testear → Integrar**. Lo detectamos durante la Fase 3: un `400` de `accounts:lookup` al recargar la página. Creamos la rama `fix/BUG-006-seed-cierra-sesiones` desde `main`, corregimos el seed para que no cambie la contraseña de los usuarios que ya existen, lo probamos y lo integramos a `main`.
+- **Archivos creados o modificados:**
+  - `scripts/seed.mjs`: a los usuarios existentes ya no se les cambia la contraseña. Opción nueva `--restablecer-claves`.
+  - `scripts/package.json`: comando `npm run seed:restablecer-claves`.
+  - `BUGS.md`: BUG-006 (resuelto) y BUG-007 (abierto, se corrige en su propia rama).
+  - `README.md`: el comando nuevo.
+- **Conceptos aprendidos:**
+  - **Revocación de sesiones:** Firebase invalida los tokens de un usuario cuando cambia su contraseña. Es una medida de seguridad: si alguien te robó la sesión, cambiar la clave lo saca.
+  - **Efecto secundario:** un script "idempotente" en los datos puede igual tener efectos en otro lado (las sesiones). Hay que mirar todo lo que toca.
+  - **Leer el log antes de adivinar:** el archivo de consola de Playwright mostraba la URL exacta (`accounts:lookup`), y con eso se encontró la causa.
+- **Comandos usados:**
+  - `git switch main`, `git pull` y `git switch -c fix/BUG-006-seed-cierra-sesiones`: rama del bug desde `main` actualizado.
+  - Prueba de regresión: iniciar sesión → `npm run seed` → recargar la página → la sesión sigue abierta, sin errores.
+  - `npm test`: 28 + 44 en verde.
+  - `git merge --no-ff fix/BUG-006-seed-cierra-sesiones` (en `main`): integración.
+- **Cómo probarlo:** abrí la app y logueate; en otra terminal corré `npm run seed` (desde `scripts/`); recargá la app: seguís logueado.
+- **Pendientes o dudas:** BUG-007 (desborde de la columna de acciones) sigue abierto y se corrige a continuación, en su propia rama.

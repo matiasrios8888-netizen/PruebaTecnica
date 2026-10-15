@@ -36,8 +36,10 @@ Todo bug o error detectado queda registrado acá, **aunque se corrija en el mome
 | BUG-003 | Mensaje confuso al abrir una solicitud inexistente o ajena | Baja | ✅ Resuelto | Fase 2 | `e761737` |
 | BUG-004 | Consultas huérfanas al cerrar sesión con datos cargando | Baja | ✅ Resuelto | Fase 2 | `fix/bugs-pre-fase-3` |
 | BUG-005 | Los mensajes de error de los formularios no se ocultaban al corregir | Baja | ✅ Resuelto | Fase 2 | `fix/bugs-pre-fase-3` |
+| BUG-006 | Recargar los datos de prueba cerraba las sesiones abiertas | Baja | ✅ Resuelto | Fase 3 | `fix/BUG-006-seed-cierra-sesiones` |
+| BUG-007 | La columna de acciones del detalle se desborda en pantallas medianas | Media | 🔴 Abierto | Fase 3 | — |
 
-**Abiertos: 0**
+**Abiertos: 1**
 
 > BUG-004 y BUG-005 se corrigieron juntos en la rama `fix/bugs-pre-fase-3`, antes de existir la regla de "una rama por bug". Desde ahora cada bug va en su propia rama `fix/BUG-NNN-…`.
 
@@ -92,6 +94,20 @@ Todo bug o error detectado queda registrado acá, **aunque se corrija en el mome
 - **Commit:** rama `fix/bugs-pre-fase-3`.
 - **Test de regresión:** prueba en el navegador de los tres casos: login, nueva solicitud y comentario en el detalle.
 
+### BUG-006 · Recargar los datos de prueba cerraba las sesiones abiertas
+- **Detectado:** Fase 3, prueba de la matriz de campos (un `400` en `identitytoolkit.googleapis.com/v1/accounts:lookup`).
+- **Severidad:** Baja (solo afecta a la demo, pero desloguea a cualquiera que la esté usando).
+- **Cómo reproducir:** iniciar sesión en la app; correr `npm run seed`; recargar la página → la sesión se cierra y la consola muestra un `400` de `accounts:lookup`.
+- **Causa:** `seed.mjs` hacía `updateUser({ password })` también sobre los usuarios que ya existían. Para Firebase, cambiar la contraseña (aunque sea la misma) invalida todas las sesiones de ese usuario. Al recargar, el SDK intenta validar la sesión vieja con `accounts:lookup`, recibe `400` y la cierra. **Es también la explicación del `400` aislado que se vio en la Fase 2**, que se había registrado como parte de BUG-004: esa prueba también se hizo justo después de recargar los datos.
+- **Solución:** a los usuarios existentes ya no se les cambia la contraseña. Para restablecerla a propósito existe `npm run seed:restablecer-claves`.
+- **Commit:** rama `fix/BUG-006-seed-cierra-sesiones`.
+- **Test de regresión:** prueba en el navegador. Iniciar sesión → `npm run seed` → recargar la página: la sesión sigue abierta y no hay respuestas con error. Además, `npm test` (28 + 44) en verde.
+
+### BUG-007 · La columna de acciones del detalle se desborda en pantallas medianas
+- **Detectado:** Fase 3, revisando una captura del detalle de una solicitud con acciones.
+- **Severidad:** Media (se ve mal y aparece scroll horizontal).
+- **Cómo reproducir:** abrir el detalle de una solicitud con acciones disponibles en una ventana de 1024 a 1550 px de ancho: la columna derecha (Acciones, Nota, Adjuntos) sobresale de la grilla (por ejemplo, 42 px a 1440 px).
+- **Estado:** Abierto. Se corrige en su propia rama `fix/BUG-007-…`.
 ---
 
 ## Observaciones (no son bugs de la app)
