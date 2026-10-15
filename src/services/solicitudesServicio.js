@@ -22,7 +22,6 @@
 
 import {
   ACCIONES,
-  ESTADOS_FINALES,
   LIMITE_BANDEJA,
   LIMITES_ADJUNTO,
   PESTANAS_BANDEJA,
@@ -99,10 +98,6 @@ function errorParaUsuario(error, mensajePorDefecto) {
   }
   return aErrorAplicacion(error, mensajePorDefecto);
 }
-
-/** Ordena solicitudes de la más reciente a la más vieja (por última actualización). */
-const porActualizacionDescendente = (a, b) =>
-  (b.fechaActualizacion?.toMillis?.() ?? 0) - (a.fechaActualizacion?.toMillis?.() ?? 0);
 
 // -------------------------------------------------------------
 // Crear
@@ -255,27 +250,6 @@ export async function cargarBandeja() {
   }
 }
 
-/**
- * Listas del inicio: tareas asignadas al usuario y solicitudes en las que participa.
- * (La bandeja completa, con filtros y búsqueda, llega en la Fase 3.)
- * @returns {Promise<{ tareas: Solicitud[], solicitudes: Solicitud[] }>}
- * @throws {ErrorAplicacion}
- */
-export async function listarInicio() {
-  try {
-    const usuario = usuarioRequerido();
-    const [tareas, participa] = await Promise.all([
-      repositorio.listarAsignadasA(usuario.id),
-      repositorio.listarDondeParticipa(usuario.id),
-    ]);
-    return {
-      tareas: tareas.filter((s) => !ESTADOS_FINALES.includes(s.estadoActual)).sort(porActualizacionDescendente),
-      solicitudes: participa.sort(porActualizacionDescendente),
-    };
-  } catch (error) {
-    throw errorParaUsuario(error, 'No se pudieron cargar tus solicitudes.');
-  }
-}
 
 // -------------------------------------------------------------
 // Acciones del flujo

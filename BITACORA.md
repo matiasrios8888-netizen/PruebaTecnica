@@ -500,3 +500,40 @@ Construimos el flujo completo Solicitar → Aprobar → Gestionar RH de punta a 
 - **Comandos usados:** `npm run test:unitarios` → 44 tests (28 del flujo + 16 de la bandeja).
 - **Cómo probarlo:** `cd scripts` y después `npm run test:unitarios`.
 - **Pendientes o dudas:** la pantalla de la bandeja va en el próximo paso. El inicio actual usa consultas que necesitan los índices compuestos, que tardan unos minutos en quedar habilitados después de publicarlos.
+
+---
+
+## 2026-10-15 – Fase 3 – Paso: pantalla Bandeja
+
+- **Qué hicimos:** la bandeja reemplaza el inicio. Tiene:
+  - pestañas Pendientes / Nuevas / Enviadas (y Todas para RH y admin), cada una con su contador; "Nuevas" se destaca si hay alguna;
+  - búsqueda, filtros por estado, etapa, tipo y rango de fechas, y orden;
+  - una tabla donde cada fila abre el detalle.
+
+  Cada pestaña es una ruta, así que el botón Atrás vuelve a la pestaña donde estabas. Filtrar es instantáneo porque no consulta Firestore, y los filtros se recuerdan al cambiar de pestaña o volver del detalle.
+- **Archivos creados o modificados:**
+  - `src/ui/pantallas/bandejaPantalla.js`: la pantalla nueva.
+  - `src/ui/componentes/tablaSolicitudes.js`: tabla reutilizable con la marca "Nueva" y filas clickeables.
+  - `src/ui/pantallas/inicioPantalla.js`: **eliminado** (lo reemplaza la bandeja).
+  - `src/services/solicitudesServicio.js`: se quitó `listarInicio()` (reemplazada por `cargarBandeja()`).
+  - `src/ui/router.js`: `RUTA_INICIO` pasa a ser `#/bandeja`; nuevas `RUTA_BANDEJA_PESTANA` y `rutaBandeja()`.
+  - `src/main.js`: registra `#/bandeja` y `#/bandeja/:pestana`.
+  - `src/ui/componentes/marco.js`: el enlace "Bandeja" queda marcado en todas sus pestañas.
+  - `src/styles/main.css`: estilos de pestañas, contadores y filtros.
+- **Conceptos aprendidos:**
+  - **Estado en la URL:** como la pestaña está en el hash, "Atrás" y los links compartidos funcionan sin código extra.
+  - **Redibujar solo lo necesario:** al filtrar se reemplaza solo `#resultados`; los datos ya leídos se reutilizan.
+  - **Defensa en profundidad:** si un supervisor escribe `#/bandeja/todas`, la pantalla lo devuelve a Pendientes; aunque no lo hiciera, las reglas rechazarían la consulta.
+  - **Índices en producción:** con los índices recién publicados, la bandeja falla unos minutos (`FAILED_PRECONDITION`) hasta que Firestore termina de construirlos (~6 minutos en este caso).
+- **Comandos usados:** prueba en el navegador con los 4 roles:
+  - supervisor: Pendientes 3, Nuevas 2, Enviadas 7, y `#/bandeja/todas` lo devuelve a Pendientes;
+  - RH: búsqueda "gomez vacaciones" (4 de 10), combinada con estado (1), filtro por tipo con orden por número, etapa finalizada, sin coincidencias, filtros conservados entre pestañas y "Limpiar filtros";
+  - iniciadora: 1 pendiente (`SOL-0004` devuelta);
+  - admin: Todas 10;
+  - "Atrás" desde un detalle vuelve a `#/bandeja/todas`;
+  - sin errores en la consola.
+- **Cómo probarlo:**
+  1. Live Server (Ctrl + F5 si no ves los cambios) → entrá como `rh@bprosys.test`.
+  2. Probá las pestañas, buscá "gomez vacaciones" y combiná filtros.
+  3. Abrí una solicitud y volvé con el botón Atrás del navegador: seguís en la misma pestaña y con los mismos filtros.
+- **Pendientes o dudas:** en las capturas el texto del orden quedaba cortado ("Actualizadas recien…"). Las etiquetas se acortaron ("Más recientes", etc.) y ese cambio entra con el commit del próximo paso, porque está en `constantes.js`, que ya tiene cambios de ese paso.

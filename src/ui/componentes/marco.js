@@ -36,7 +36,7 @@ export function dibujarMarco(contenedor, usuario) {
     <header class="encabezado">
       <a href="${RUTA_INICIO}" class="encabezado__marca">Permisos</a>
       <nav class="nav">
-        <a href="${RUTA_INICIO}" class="nav__enlace">Inicio</a>
+        <a href="${RUTA_INICIO}" class="nav__enlace">Bandeja</a>
         ${enlaceNueva}
       </nav>
       <div class="encabezado__usuario">
@@ -47,9 +47,12 @@ export function dibujarMarco(contenedor, usuario) {
     <main class="contenido" id="contenido"></main>
   `;
 
-  // Marca el enlace de la sección actual.
+  // Marca el enlace de la sección actual (la bandeja incluye todas sus pestañas).
+  const hash = window.location.hash || RUTA_INICIO;
   for (const enlace of contenedor.querySelectorAll('.nav__enlace')) {
-    if (enlace.getAttribute('href') === window.location.hash) enlace.setAttribute('aria-current', 'page');
+    const destino = enlace.getAttribute('href');
+    const esActual = destino === RUTA_INICIO ? hash.startsWith(RUTA_INICIO) : hash === destino;
+    if (esActual) enlace.setAttribute('aria-current', 'page');
   }
   contenedor.querySelector('#botonSalir').addEventListener('click', () => cerrarSesion());
   return contenedor.querySelector('#contenido');
