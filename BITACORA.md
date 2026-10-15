@@ -884,3 +884,46 @@ Construimos la bandeja de tareas: pestañas Pendientes, Nuevas y Enviadas (y Tod
   - `git switch -c fix/quitar-script-temporal`, `git rm --cached scripts/tmp-prueba-fase4.mjs`, commit, `git merge --no-ff` a `main` y `git push`.
 - **Cómo probarlo:** `git ls-files scripts` ya no lista el script, y `git check-ignore -v scripts/tmp-prueba-fase4.mjs` muestra la regla que lo ignora.
 - **Pendientes o dudas:** ninguno.
+
+## 2026-10-15 – Fase 4 – Paso: integración de correcciones, prueba integral y cierre
+
+- **Qué hicimos:**
+  - Trajimos a `feature/mantenimiento` las correcciones de `main` (BUG-008 y OBS-005) y resolvimos 2 conflictos de merge, conservando las dos versiones.
+  - Hicimos una prueba integral del mantenimiento junto con el flujo de solicitudes, actualizamos el README y cerramos la fase.
+- **Archivos creados o modificados:**
+  - `src/main.js` y `BITACORA.md`: conflictos resueltos.
+    - En `main.js`, las importaciones de las pantallas nuevas más `limpiarAvisos`.
+    - En la bitácora, las entradas de la fase seguidas de las dos correcciones.
+  - `README.md`: Fase 4 ✅, qué puede hacer el admin, la estructura nueva y los usuarios de prueba Sofía y Pedro.
+- **Conceptos aprendidos:**
+  - **Prueba integral:** además de probar cada pantalla por separado, se prueba un caso de punta a punta que cruza módulos. Acá, que los bloqueos del mantenimiento sigan el ciclo de vida real de un trámite.
+  - **Sincronizar bien una prueba automática:** dos veces una prueba "falló" porque esperaba un elemento que también existía en otra pantalla. Pasó con un `<tr>` que contenía el nombre del supervisor y con el campo `email` de la ficha. La solución es esperar algo que identifique sin ambigüedad a la pantalla esperada.
+- **Comandos usados:**
+  - `git merge main` (en la rama de la fase), resolución de conflictos y `git commit --no-edit`.
+  - `npm test`: 82 unitarios y 69 de reglas, en verde.
+  - Prueba integral en el navegador:
+    1. Martín da de alta a Lucía Torres (iniciadora, supervisora Sofía) y se abre su ficha.
+    2. Lucía pide un permiso (`SOL-0011`) y Sofía lo aprueba.
+    3. Mientras está abierto, Lucía no se puede dar de baja (participa en `SOL-0011`), y Sofía tampoco (por `SOL-0011` y por tener a Lucía a cargo).
+    4. Laura lo completa (`LIQ-2026-1102`). Lucía queda libre y se la da de baja; entonces Sofía también se puede dar de baja.
+    5. Al salir con un aviso a la vista, el login queda sin avisos (BUG-008 integrado).
+  - Limpieza: con un script temporal ignorado por git, se borraron los 3 usuarios de prueba que quedaban (el de "alta interrumpida" ya se había borrado). Después, `npm run seed` (6 usuarios, 10 solicitudes, contador en 10) y se borró el script.
+  - `git merge --no-ff feature/mantenimiento` (en `main`) y `git push`.
+- **Cómo probarlo:** Live Server (Ctrl + F5) y repetir el recorrido de arriba con los usuarios de prueba.
+- **Pendientes o dudas:**
+  - `BUGS.md` tiene 0 bugs abiertos.
+  - Quedan como mejoras:
+    - obligar a cambiar la contraseña inicial en el primer ingreso;
+    - paginar la bandeja (más de 200 solicitudes por lista).
+
+---
+
+## Resumen de la Fase 4
+
+Construimos el mantenimiento de usuarios y roles para el administrador:
+- **Usuarios:** listado con búsqueda, alta, edición, baja lógica, reactivación y mail para cambiar la contraseña.
+- **Alta sin perder la sesión:** la cuenta se crea en una segunda instancia de Firebase, así el admin sigue logueado, y si el alta se corta a mitad de camino se puede completar reintentándola.
+- **Bloqueos:** la baja y el cambio de rol se bloquean mientras el usuario tenga trámites abiertos, colaboradores a cargo o sea el último RH, para que ningún trámite quede trabado. La pantalla muestra los motivos y el servicio los vuelve a verificar al guardar.
+- **Roles:** son los 4 que conoce el flujo. El admin edita su nombre y descripción y puede volver a crear uno que se pierda, siempre con sus permisos de fábrica.
+- **Calidad:** la lógica es pura y testeada, y las reglas de Firestore suman lo que el servidor puede garantizar. Terminamos con 151 tests en verde.
+- **Proceso:** encontramos y corregimos un bug en código ya publicado (BUG-008) y un error de proceso (OBS-005) con el flujo de ramas `fix/`, sin tocar `main` directamente.
