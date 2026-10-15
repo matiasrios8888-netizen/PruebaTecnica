@@ -145,3 +145,11 @@ Los navegadores guardan en caché los módulos JavaScript. En desarrollo: Live S
 
 ### OBS-004 · (Entorno) git no podía autenticarse con GitHub
 La configuración global de git (`~/.gitconfig`) apuntaba a un `gh.exe` que ya no existía (carpeta temporal de otro proyecto). Se resolvió en la Fase 1 con `gh auth login` y `gh auth setup-git`.
+
+### OBS-005 · (Proceso) Un script temporal de pruebas se subió a `main`
+Al integrar la corrección del BUG-008, `git add -A` incluyó `scripts/tmp-prueba-fase4.mjs`, un script temporal que prepara escenarios de prueba con `firebase-admin`. La regla `scripts/tmp-*` del `.gitignore` se había agregado en la rama de la Fase 4, que todavía no estaba en `main`, así que en la rama `fix/` el archivo no estaba ignorado. El `git status` previo al commit lo mostraba (`A scripts/tmp-prueba-fase4.mjs`) y no se frenó.
+- **Impacto:** el script **no contiene la clave de servicio** (solo la lee de `scripts/serviceAccountKey.json`, que sigue ignorado y nunca se subió; se verificó con `git grep` que el repositorio no tiene claves privadas). Contiene emails de prueba y la contraseña inicial de cuentas de prueba que se borran al cerrar la fase.
+- **Corrección:** rama `fix/quitar-script-temporal`: `git rm --cached` (el archivo sigue en el disco) y la regla `scripts/tmp-*` en el `.gitignore` de `main`. No se reescribió el historial, porque no hay ningún secreto que borrar.
+- **Lección:**
+  - Antes de cada commit, revisar la lista de `git status` buscando archivos inesperados, sobre todo después de cambiar de rama.
+  - Las reglas del `.gitignore` que protegen archivos locales tienen que estar en `main`, no solo en una rama de trabajo.

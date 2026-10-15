@@ -6,6 +6,8 @@
 # Con este archivo cualquiera tendría acceso total a la base de datos.
 serviceAccountKey.json
 *-firebase-adminsdk-*.json
+# Scripts temporales de prueba: usan la clave de servicio y no son parte del proyecto.
+scripts/tmp-*
 
 # Variables de entorno y secretos locales
 .env

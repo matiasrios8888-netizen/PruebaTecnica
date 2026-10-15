@@ -673,3 +673,23 @@ Construimos la bandeja de tareas: pestañas Pendientes, Nuevas y Enviadas (y Tod
   - `git merge --no-ff` a `main` y `git push`.
 - **Cómo probarlo:** agregar una nota y apretar "Salir" enseguida. El aviso "Nota agregada" no tiene que quedar en la pantalla de login.
 - **Pendientes o dudas:** traer la corrección a `feature/mantenimiento` (`git merge main`) antes de cerrar la Fase 4.
+
+## 2026-10-15 – Fase 4 – Corrección: script temporal subido por error a `main` (OBS-005)
+
+- **Qué hicimos:**
+  - Al integrar el BUG-008 se subió a `main`, por error, el script temporal de pruebas `scripts/tmp-prueba-fase4.mjs`. La regla del `.gitignore` que lo excluye solo existía en la rama de la Fase 4.
+  - Lo sacamos del repositorio en una rama `fix/`, sin borrarlo del disco, y agregamos la regla al `.gitignore` de `main`.
+  - Verificamos que no se subió ninguna clave: el script solo lee `serviceAccountKey.json`, que sigue ignorado.
+- **Archivos creados o modificados:**
+  - `.gitignore`: `scripts/tmp-*`.
+  - `scripts/tmp-prueba-fase4.mjs`: deja de estar en el repositorio.
+  - `BUGS.md`: OBS-005, con la lección.
+- **Conceptos aprendidos:**
+  - **`git rm --cached`:** deja de seguir un archivo en git sin borrarlo del disco.
+  - **El `.gitignore` depende de la rama:** cada rama tiene su versión del `.gitignore`. Una regla agregada en una rama de trabajo no protege nada en las demás hasta que se integra.
+  - **Cuándo reescribir el historial:** si se hubiera subido una clave, no alcanzaría con borrarla en un commit nuevo. Habría que revocarla en Firebase y, además, limpiar el historial. Acá no había ningún secreto, así que alcanza con un commit que lo saque.
+- **Comandos usados:**
+  - `git grep -n "BEGIN PRIVATE KEY\|private_key" HEAD`: sin resultados.
+  - `git switch -c fix/quitar-script-temporal`, `git rm --cached scripts/tmp-prueba-fase4.mjs`, commit, `git merge --no-ff` a `main` y `git push`.
+- **Cómo probarlo:** `git ls-files scripts` ya no lista el script, y `git check-ignore -v scripts/tmp-prueba-fase4.mjs` muestra la regla que lo ignora.
+- **Pendientes o dudas:** ninguno.
