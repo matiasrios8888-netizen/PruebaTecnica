@@ -58,6 +58,7 @@ scripts/                    Herramientas de Node (no se publican): datos de prue
 docs/MODELO_DATOS.md        Colecciones, campos, tipos y ejemplos
 DECISIONES.md               Decisiones técnicas con alternativas y justificación
 BITACORA.md                 Registro paso a paso de la construcción
+BUGS.md                     Registro de bugs y observaciones (se resuelven antes de cada fase)
 ```
 
 El modelo de datos está documentado en [docs/MODELO_DATOS.md](docs/MODELO_DATOS.md) y las decisiones técnicas en [DECISIONES.md](DECISIONES.md).

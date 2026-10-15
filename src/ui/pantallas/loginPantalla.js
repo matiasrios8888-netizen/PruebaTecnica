@@ -47,6 +47,9 @@ export function renderizarLogin(contenedor) {
   const mensajeError = contenedor.querySelector('#errorLogin');
   const boton = formulario.querySelector('button[type="submit"]');
 
+  // Al volver a escribir se oculta el error anterior (BUGS.md · BUG-005).
+  formulario.addEventListener('input', () => { mensajeError.hidden = true; });
+
   formulario.addEventListener('submit', async (evento) => {
     evento.preventDefault(); // evita que el navegador recargue la página al enviar
     const datos = new FormData(formulario);
