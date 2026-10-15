@@ -60,6 +60,12 @@ El desarrollador es junior y necesita **entender** todo lo que se construye (des
 - `BITACORA.md` = paso a paso; `DECISIONES.md` = solo decisiones técnicas importantes. No duplicar.
 - `BITACORA.md` se incluye en los commits junto con los cambios que describe.
 
+### Registro de bugs (BUGS.md)
+- Todo bug o error se registra en `BUGS.md` **apenas se detecta**, aunque se corrija en el momento: ID correlativo `BUG-NNN`, fase, severidad (alta / media / baja), estado, cómo reproducirlo, causa, solución, commit y test de regresión.
+- Lo que no es un bug de la app (comportamiento del SDK, del navegador o del entorno) va en la sección **Observaciones** de `BUGS.md`, con la explicación.
+- **Antes de iniciar una nueva fase:** corregir todos los bugs abiertos en una rama `fix/bugs-pre-fase-N`, **sin romper nada**: correr `npm test` (desde `scripts/`) y una prueba manual del flujo afectado; recién después merge a `main` y empezar la fase.
+- Siempre que se pueda, agregar un test de regresión. Si ayuda a entender el código, referenciar el bug con `// BUGS.md · BUG-NNN`.
+
 ---
 
 ## Stack y arquitectura
