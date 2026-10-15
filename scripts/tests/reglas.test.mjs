@@ -369,6 +369,13 @@ describe('solicitudes: creación', () => {
     await assertFails(crear('ini', { estadoActual: 'enGestionRh', etapaActual: 'gestionRh' }));
   });
 
+  test('se puede crear con 3 adjuntos (el máximo al crear) en un mismo lote', async () => {
+    // Cada documento del lote evalúa reglas con get()/exists(): este caso verifica
+    // que el lote más grande que arma la app no supera los límites de Firestore.
+    const tres = [adjunto(600 * 1024), adjunto(600 * 1024), adjunto(600 * 1024)];
+    await assertSucceeds(crear('ini', { tipoPermiso: 'enfermedad', fechaFin: '2026-11-05', cantidadDias: 3 }, { adjuntos: tres }));
+  });
+
   test('enfermedad exige adjunto: sin archivo se rechaza, con archivo se acepta', async () => {
     const enfermedad = { tipoPermiso: 'enfermedad', fechaFin: '2026-11-05', cantidadDias: 3 };
     await assertFails(crear('ini', enfermedad));

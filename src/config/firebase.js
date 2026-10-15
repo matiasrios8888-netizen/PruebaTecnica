@@ -56,4 +56,12 @@ export {
 export {
   doc,
   getDoc,
+  getDocs,
+  collection,
+  query,
+  where,
+  orderBy,
+  runTransaction,
+  updateDoc,
+  serverTimestamp,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';

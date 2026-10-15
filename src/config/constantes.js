@@ -340,4 +340,7 @@ export const LIMITES_ADJUNTO = Object.freeze({
   tamanoMaximoBytes: 600 * 1024, // 614.400
   longitudMaximaBase64: Math.ceil((600 * 1024) / 3) * 4, // 819.200
   tiposMimePermitidos: Object.freeze(['application/pdf', 'image/jpeg', 'image/png']),
+  // Archivos que se pueden adjuntar al crear la solicitud (todos viajan en una sola
+  // transacción; Firestore limita cada operación a 10 MiB).
+  maximoAlCrear: 3,
 });

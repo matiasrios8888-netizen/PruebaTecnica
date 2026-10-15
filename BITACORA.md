@@ -255,3 +255,36 @@ Armamos la base de una app de permisos con arquitectura en capas (UI → servici
   1. `cd scripts` y después `npm test` → `pass 28` y `pass 43`.
   2. `npm run seed:simular` → la misma tabla de 10 solicitudes que antes.
 - **Pendientes o dudas:** el módulo todavía no lo usa ninguna pantalla; lo usa el servicio de solicitudes en el próximo paso.
+
+---
+
+## 2026-10-15 – Fase 2 – Paso: repositorio y servicio de solicitudes
+
+- **Qué hicimos:** conectamos la lógica del flujo con Firestore.
+  - **Repositorio:** sabe *cómo* guardar (transacciones, ids, hora del servidor, enlace `ultimoEventoId`), pero no decide nada.
+  - **Servicio:** decide *qué* guardar usando `flujoSolicitud.js`. Casos de uso: crear (con número correlativo y adjuntos), ver el detalle, ejecutar acciones del flujo, agregar notas y adjuntos, y listar las tareas y solicitudes del usuario.
+
+  Lo probamos contra el proyecto real con un recorrido completo de 3 roles.
+- **Archivos creados o modificados:**
+  - `src/data/solicitudesRepositorio.js`: lecturas (solicitud, historial, adjuntos, asignadas, donde participa) y escrituras con transacción (`crearConNumero`, `actualizarConEvento`), más `marcarComoVista`.
+  - `src/services/solicitudesServicio.js`: `crearSolicitud`, `obtenerDetalle`, `listarInicio`, `ejecutarAccion`, `agregarNota`, `agregarAdjunto`.
+  - `src/services/archivos.js`: convertir archivos del navegador a base64 y de base64 a una URL para abrirlos.
+  - `src/services/errores.js`: `aErrorAplicacion()` traduce los errores de Firestore (`permission-denied`, `unavailable`…) a mensajes en español.
+  - `src/data/usuariosRepositorio.js`: `listarUsuariosPorRol()` (para el reparto RH).
+  - `src/config/firebase.js`: reexporta las funciones de Firestore que se usan ahora.
+  - `src/config/constantes.js`: `LIMITES_ADJUNTO.maximoAlCrear = 3`.
+  - `scripts/tests/reglas.test.mjs`: test de creación con 3 adjuntos de 600 KB (44 tests).
+- **Conceptos aprendidos:**
+  - **Función "armar" (inversión de control):** el repositorio abre la transacción y lee los datos frescos, pero quien decide qué escribir es el servicio. Así el repositorio no conoce reglas de negocio y el servicio no conoce detalles de Firestore.
+  - **Transacción y concurrencia:** cada acción se valida con la solicitud leída dentro de la transacción. Si dos personas actúan a la vez, la segunda ve el estado ya cambiado y recibe un error claro, en lugar de pisar el trabajo de la primera.
+  - **Validar antes de convertir:** el tamaño del archivo se controla antes de pasarlo a base64, que lo agranda un 33 %.
+  - **Mensajes al usuario vs. detalle técnico:** el usuario ve "No tenés permiso…"; el error original queda en la consola para quien depure.
+- **Comandos usados:**
+  - `npm run test:reglas`: 44 tests.
+  - Prueba de integración en el navegador (Playwright) contra el proyecto real: Ana crea `SOL-0011` y agrega una nota → Carlos intenta devolver sin comentario (rechazado) y devuelve con comentario → Ana corrige las fechas y reenvía → Carlos aprueba → Laura adjunta un PDF (un archivo de 700 KB y un .exe fueron rechazados) y completa. El historial quedó con los 7 eventos en orden.
+- **Cómo probarlo:** las pantallas llegan en los próximos pasos. Mientras tanto, con la app abierta y logueado, en la consola del navegador (F12):
+  ```js
+  const srv = await import('/src/services/solicitudesServicio.js');
+  await srv.listarInicio();
+  ```
+- **Pendientes o dudas:** la prueba de integración dejó `SOL-0011` en la base; al cerrar la fase se recargan los datos de prueba.
