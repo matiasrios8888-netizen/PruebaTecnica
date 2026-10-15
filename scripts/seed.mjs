@@ -18,6 +18,7 @@
  *   npm run seed           → carga los datos
  *
  * Depende de: firebase-admin, scripts/datosPrueba.mjs, src/config/constantes.js,
+ *   src/services/flujoSolicitud.js (la misma lógica de flujo que usa la app),
  *   scripts/serviceAccountKey.json (clave privada, ignorada por git).
  *
  * 🔒 SEGURIDAD: firebase-admin usa la clave de cuenta de servicio y SALTEA las
@@ -37,14 +38,15 @@ import {
   ROLES,
   NOMBRES_ROL,
   PERMISOS_POR_ROL,
-  ESTADOS,
   ESTADOS_FINALES,
-  EJECUTORES,
   ACCIONES,
-  ACCIONES_HISTORIAL,
-  TRANSICIONES,
-  CONFIG_TIPOS_PERMISO,
 } from '../src/config/constantes.js';
+import {
+  validarDatosSolicitud,
+  calcularTransicion,
+  construirEventoNota,
+  construirEventoAdjunto,
+} from '../src/services/flujoSolicitud.js';
 import {
   PASO_NOTA,
   PASO_ADJUNTO,
@@ -134,131 +136,97 @@ function crearPdfDePrueba(titulo) {
 // -------------------------------------------------------------
 
 /**
- * Recorre el guion de una solicitud aplicando la tabla TRANSICIONES y arma
- * el documento final, los eventos del historial y los adjuntos.
+ * Recorre el guion de una solicitud con la MISMA lógica que usa la app
+ * (src/services/flujoSolicitud.js) y arma el documento final, los eventos
+ * del historial y los adjuntos.
  *
- * ⚠️ IMPORTANTE: cada acción se valida igual que lo hará la app (estado de
- * origen, rol, ejecutor y comentario obligatorio). Si el guion tiene un paso
- * imposible, el script falla en lugar de cargar datos incoherentes.
+ * ⚠️ IMPORTANTE: cada paso se valida como en la app (estado de origen, rol,
+ * ejecutor, comentario obligatorio, días máximos, adjunto obligatorio). Si el
+ * guion tiene un paso imposible, el script falla en lugar de cargar datos
+ * incoherentes.
  *
  * @param {object} guion - Un elemento de SOLICITUDES_PRUEBA.
  * @param {string} numero - Número legible (ej: "SOL-0001").
- * @param {Record<string, {uid: string, nombre: string, rol: string, supervisor: string|null}>} usuarios
+ * @param {Record<string, import('../src/data/modelos.js').Usuario & {supervisor: string|null}>} usuarios
  * @param {Date} ahora - Momento de referencia para las fechas relativas.
  * @returns {{ solicitud: object, eventos: object[], adjuntos: object[] }}
  * @throws {Error} Si algún paso del guion no cumple las reglas del flujo.
  */
 function construirSolicitud(guion, numero, usuarios, ahora) {
   const solicitante = usuarios[ROLES.INICIADOR];
-  const configTipo = CONFIG_TIPOS_PERMISO[guion.tipoPermiso];
-  const fallar = (mensaje) => {
-    throw new Error(`${numero}: ${mensaje}`);
-  };
+  const supervisor = usuarios[solicitante.supervisor];
+  const usuariosRh = Object.values(usuarios).filter((u) => u.rol === ROLES.RH);
 
-  if (!configTipo) fallar(`tipo de permiso desconocido "${guion.tipoPermiso}"`);
-  if (guion.cantidadDias > configTipo.diasMaximos) {
-    fallar(`${configTipo.nombre} admite como máximo ${configTipo.diasMaximos} días`);
-  }
+  // Los errores del módulo de flujo se re-lanzan indicando la solicitud del guion.
+  const conNumero = (funcion) => {
+    try {
+      return funcion();
+    } catch (error) {
+      throw new Error(`${numero}: ${error.message}`);
+    }
+  };
 
   // Fecha de creación: N días atrás a las 9:30.
   let fechaActual = new Date(ahora.getTime() - guion.creadaHaceDias * MS_POR_DIA);
   fechaActual.setHours(9, 30, 0, 0);
   const fechaCreacion = new Date(fechaActual);
+  const inicio = new Date(fechaCreacion.getTime() + guion.inicioEnDias * MS_POR_DIA);
+  const fin = new Date(inicio.getTime() + (guion.cantidadDias - 1) * MS_POR_DIA);
 
-  const fechaInicio = new Date(fechaCreacion.getTime() + guion.inicioEnDias * MS_POR_DIA);
-  const fechaFin = new Date(fechaInicio.getTime() + (guion.cantidadDias - 1) * MS_POR_DIA);
+  const datos = conNumero(() =>
+    validarDatosSolicitud(
+      {
+        tipoPermiso: guion.tipoPermiso,
+        fechaInicio: aFechaCalendario(inicio),
+        fechaFin: aFechaCalendario(fin),
+        motivo: guion.motivo,
+      },
+      { cantidadAdjuntos: guion.adjuntosIniciales.length },
+    ),
+  );
 
-  const estado = { estadoActual: null, etapaActual: null, asignado: null };
-  const participantes = new Set([solicitante.uid]);
   const eventos = [];
   const adjuntos = [];
-  let cantidadNotas = 0;
 
-  /** ⚠️ IMPORTANTE: a quién le toca actuar según el estado nuevo. */
-  const resolverAsignado = (estadoNuevo) => {
-    if (estadoNuevo === ESTADOS.EN_APROBACION) return usuarios[solicitante.supervisor];
-    if (estadoNuevo === ESTADOS.DEVUELTA) return solicitante;
-    if (estadoNuevo === ESTADOS.EN_GESTION_RH) return usuarios[ROLES.RH]; // único usuario RH de prueba
-    return null; // estados finales
+  /** 📝 TRAZABILIDAD: guarda el evento con la fecha simulada del guion. */
+  const registrarEvento = (evento) => {
+    if (fechaActual > ahora) throw new Error(`${numero}: el guion genera un evento en el futuro; reducí las horas`);
+    eventos.push({ ...evento, fecha: Timestamp.fromDate(fechaActual) });
   };
 
-  /** 📝 TRAZABILIDAD: arma un evento del historial con la forma de EventoHistorial. */
-  const registrarEvento = (accion, actor, cambio, comentario) => {
-    if (fechaActual > ahora) fallar('el guion genera un evento en el futuro; reducí las horas');
-    eventos.push({
-      accion,
-      usuarioId: actor.uid,
-      usuarioNombre: actor.nombre,
-      rolUsuario: actor.rol,
-      fecha: Timestamp.fromDate(fechaActual),
-      estadoAnterior: cambio?.estadoAnterior ?? null,
-      estadoNuevo: cambio?.estadoNuevo ?? null,
-      etapaAnterior: cambio?.etapaAnterior ?? null,
-      etapaNueva: cambio?.etapaNueva ?? null,
-      comentario: comentario ?? '',
-    });
-  };
-
-  const aplicarAccion = (accion, actor, comentario) => {
-    const transicion = TRANSICIONES[accion];
-    if (!transicion) fallar(`acción desconocida "${accion}"`);
-
-    const estadoValido =
-      transicion.estadosOrigen.length === 0
-        ? estado.estadoActual === null
-        : transicion.estadosOrigen.includes(estado.estadoActual);
-    if (!estadoValido) fallar(`no se puede "${accion}" desde el estado "${estado.estadoActual}"`);
-    if (actor.rol !== transicion.rolRequerido) fallar(`"${accion}" requiere rol "${transicion.rolRequerido}"`);
-    if (transicion.ejecutor === EJECUTORES.ASIGNADO && actor.uid !== estado.asignado?.uid) {
-      fallar(`"${accion}" solo la puede hacer el usuario asignado`);
-    }
-    if (transicion.ejecutor === EJECUTORES.SOLICITANTE && actor.uid !== solicitante.uid) {
-      fallar(`"${accion}" solo la puede hacer el solicitante`);
-    }
-    if (transicion.requiereComentario && !comentario?.trim()) fallar(`"${accion}" requiere un comentario`);
-
-    registrarEvento(
-      transicion.accionHistorial,
-      actor,
-      {
-        estadoAnterior: estado.estadoActual,
-        estadoNuevo: transicion.estadoNuevo,
-        etapaAnterior: estado.etapaActual,
-        etapaNueva: transicion.etapaNueva,
-      },
-      comentario,
-    );
-
-    estado.estadoActual = transicion.estadoNuevo;
-    estado.etapaActual = transicion.etapaNueva;
-    estado.asignado = resolverAsignado(transicion.estadoNuevo);
-    participantes.add(actor.uid);
-    if (estado.asignado) participantes.add(estado.asignado.uid);
-  };
-
-  const agregarAdjunto = (archivo, actor) => {
+  const agregarAdjunto = (archivo, actor, solicitudActual) => {
     const contenido = crearPdfDePrueba(archivo.titulo);
     adjuntos.push({
       nombreArchivo: archivo.nombreArchivo,
       tipoMime: 'application/pdf',
       tamanoBytes: contenido.length,
       contenidoBase64: contenido.toString('base64'),
-      subidoPor: actor.uid,
+      subidoPor: actor.id,
       subidoPorNombre: actor.nombre,
       fechaSubida: Timestamp.fromDate(fechaActual),
     });
-    registrarEvento(ACCIONES_HISTORIAL.ADJUNTO_AGREGADO, actor, null, archivo.nombreArchivo);
-    participantes.add(actor.uid);
+    registrarEvento(conNumero(() => construirEventoAdjunto(solicitudActual, actor, archivo.nombreArchivo)));
   };
 
-  // 1. Creación y adjuntos iniciales (un minuto después cada uno).
-  aplicarAccion(ACCIONES.CREAR, solicitante, '');
+  // 1. Creación (igual que la app: transición "crear" + adjuntos iniciales).
+  const creacion = conNumero(() =>
+    calcularTransicion({ accion: ACCIONES.CREAR, solicitud: null, usuario: solicitante, numero, solicitante, supervisor, usuariosRh }),
+  );
+  let solicitud = {
+    numero,
+    ...datos,
+    solicitanteId: solicitante.id,
+    solicitanteNombre: solicitante.nombre,
+    supervisorId: supervisor.id,
+    cantidadAdjuntos: guion.adjuntosIniciales.length,
+    cantidadNotas: 0,
+    fechaCreacion: Timestamp.fromDate(fechaCreacion),
+    ...creacion.cambios,
+  };
+  registrarEvento(creacion.evento);
   for (const archivo of guion.adjuntosIniciales) {
     fechaActual = new Date(fechaActual.getTime() + 60 * 1000);
-    agregarAdjunto(archivo, solicitante);
-  }
-  if (configTipo.requiereAdjunto && adjuntos.length === 0) {
-    fallar(`${configTipo.nombre} requiere al menos un adjunto`);
+    agregarAdjunto(archivo, solicitante, null);
   }
 
   // 2. Pasos del guion, en orden.
@@ -266,39 +234,34 @@ function construirSolicitud(guion, numero, usuarios, ahora) {
     fechaActual = new Date(fechaActual.getTime() + paso.horas * MS_POR_HORA);
     const actor = usuarios[paso.por];
     if (paso.accion === PASO_NOTA) {
-      registrarEvento(ACCIONES_HISTORIAL.NOTA_AGREGADA, actor, null, paso.comentario);
-      participantes.add(actor.uid);
-      cantidadNotas += 1;
+      registrarEvento(conNumero(() => construirEventoNota(solicitud, actor, paso.comentario)));
+      solicitud = { ...solicitud, cantidadNotas: solicitud.cantidadNotas + 1 };
     } else if (paso.accion === PASO_ADJUNTO) {
-      agregarAdjunto(paso.archivo, actor);
+      agregarAdjunto(paso.archivo, actor, solicitud);
+      solicitud = { ...solicitud, cantidadAdjuntos: solicitud.cantidadAdjuntos + 1 };
     } else {
-      aplicarAccion(paso.accion, actor, paso.comentario);
+      const { cambios, evento } = conNumero(() =>
+        calcularTransicion({
+          accion: paso.accion,
+          solicitud,
+          usuario: actor,
+          comentario: paso.comentario,
+          numero,
+          solicitante,
+          supervisor,
+          usuariosRh,
+        }),
+      );
+      solicitud = { ...solicitud, ...cambios };
+      registrarEvento(evento);
     }
   }
 
-  const esFinal = ESTADOS_FINALES.includes(estado.estadoActual);
-  const solicitud = {
-    numero,
-    tipoPermiso: guion.tipoPermiso,
-    fechaInicio: aFechaCalendario(fechaInicio),
-    fechaFin: aFechaCalendario(fechaFin),
-    cantidadDias: guion.cantidadDias,
-    motivo: guion.motivo,
-    solicitanteId: solicitante.uid,
-    solicitanteNombre: solicitante.nombre,
-    supervisorId: usuarios[solicitante.supervisor].uid,
-    etapaActual: estado.etapaActual,
-    estadoActual: estado.estadoActual,
-    asignadoA: estado.asignado?.uid ?? null,
-    asignadoNombre: estado.asignado?.nombre ?? null,
-    rolAsignado: estado.asignado?.rol ?? null,
-    vistaPorAsignado: esFinal ? true : Boolean(guion.vistaPorAsignado),
-    participantes: [...participantes],
-    cantidadAdjuntos: adjuntos.length,
-    cantidadNotas,
-    fechaCreacion: Timestamp.fromDate(fechaCreacion),
-    fechaActualizacion: Timestamp.fromDate(fechaActual),
-  };
+  // "vistaPorAsignado" lo decide el guion (simula si el asignado ya la abrió).
+  if (!ESTADOS_FINALES.includes(solicitud.estadoActual)) {
+    solicitud.vistaPorAsignado = Boolean(guion.vistaPorAsignado);
+  }
+  solicitud.fechaActualizacion = Timestamp.fromDate(fechaActual);
 
   return { solicitud, eventos, adjuntos };
 }
@@ -326,7 +289,8 @@ async function prepararUsuariosAuth(auth) {
       uid = (await auth.createUser(propiedades)).uid;
       console.log(`  + Auth: ${datos.email} (creado)`);
     }
-    resultado[clave] = { ...datos, uid };
+    // "id" y "activo" con la forma de Usuario (modelos.js), que espera flujoSolicitud.js.
+    resultado[clave] = { ...datos, uid, id: uid, activo: true };
   }
   return resultado;
 }
@@ -418,7 +382,7 @@ async function main() {
     console.log('  ✔ Conexión con Firestore (la base de datos existe)');
     // uids ficticios: alcanzan para validar los guiones.
     usuarios = Object.fromEntries(
-      Object.entries(USUARIOS_PRUEBA).map(([k, datos]) => [k, { ...datos, uid: `uid-${k}` }]),
+      Object.entries(USUARIOS_PRUEBA).map(([k, datos]) => [k, { ...datos, uid: `uid-${k}`, id: `uid-${k}`, activo: true }]),
     );
   } else {
     console.log('1) Usuarios en Authentication');

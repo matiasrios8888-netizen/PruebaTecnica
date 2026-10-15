@@ -226,3 +226,32 @@ Armamos la base de una app de permisos con arquitectura en capas (UI → servici
   2. En la consola de Firebase: existe `contadores/solicitudes` con `ultimoNumero: 10`, y cada solicitud tiene `ultimoEventoId`, que coincide con el id de un documento de su `historial`.
   3. El login sigue funcionando con los 4 usuarios.
 - **Pendientes o dudas:** el seed todavía asigna RH con su propia lógica; en el próximo paso pasa a usar el módulo compartido `flujoSolicitud.js`.
+
+---
+
+## 2026-10-15 – Fase 2 – Paso: lógica pura del flujo (flujoSolicitud.js)
+
+- **Qué hicimos:** escribimos el módulo que **interpreta** la tabla de transiciones: qué acciones puede hacer cada usuario sobre una solicitud, qué cambia al ejecutarlas, a quién se asigna la tarea (con el reparto rotativo de RH) y las validaciones de datos, notas y adjuntos. Es puro, es decir, no usa Firebase, así que lo probamos con 28 tests unitarios. Además, el script de datos de prueba dejó su propia copia de la lógica y ahora usa este mismo módulo.
+- **Archivos creados o modificados:**
+  - `src/services/flujoSolicitud.js`:
+    - `accionesDisponibles`, `calcularTransicion`, `elegirUsuarioRh`;
+    - `validarDatosSolicitud`, `validarArchivoAdjunto`, `validarComentario`;
+    - `construirEventoNota`, `construirEventoAdjunto`;
+    - `calcularCantidadDias`, `formatearNumeroSolicitud`.
+  - `scripts/tests/flujoSolicitud.test.mjs`: 28 tests unitarios del módulo.
+  - `scripts/seed.mjs`: `construirSolicitud` ahora usa `flujoSolicitud.js` (misma lógica que la app). La simulación da exactamente el mismo resultado que antes.
+  - `scripts/package.json`: comandos `npm test` (todo) y `npm run test:flujo`.
+  - `README.md`: tabla de comandos de tests.
+- **Conceptos aprendidos:**
+  - **Función pura:** con los mismos datos de entrada devuelve siempre el mismo resultado y no toca nada externo (base de datos, pantalla, reloj). Es la parte más fácil de testear y de reutilizar.
+  - **Test unitario:** prueba una función aislada, en milisegundos y sin servicios externos. Los tests de reglas, en cambio, son de integración: necesitan el emulador.
+  - **Una sola fuente de lógica:** la app y el seed llaman a `calcularTransicion`, así que no pueden "pensar distinto" sobre el flujo.
+  - **Fechas en UTC:** para contar días se usa `Date.UTC`, así un cambio de horario de verano no hace que un día "dure" 23 o 25 horas. Además se detectan fechas imposibles (30 de febrero).
+- **Comandos usados:**
+  - `npm run test:flujo`: 28 tests en ~0,1 s.
+  - `npm test`: corre las dos suites (71 tests).
+  - `npm run seed:simular`: confirma que el seed refactorizado produce los mismos datos.
+- **Cómo probarlo:**
+  1. `cd scripts` y después `npm test` → `pass 28` y `pass 43`.
+  2. `npm run seed:simular` → la misma tabla de 10 solicitudes que antes.
+- **Pendientes o dudas:** el módulo todavía no lo usa ninguna pantalla; lo usa el servicio de solicitudes en el próximo paso.

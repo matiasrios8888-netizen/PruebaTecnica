@@ -95,7 +95,9 @@ npm install
 |---|---|
 | `npm run seed:simular` | Valida los datos de prueba y la conexión **sin escribir nada**. |
 | `npm run seed` | Crea o actualiza los 4 usuarios, los roles y 10 solicitudes con historial y adjuntos. Es idempotente. |
-| `npm run test:reglas` | Corre 30 tests de `firestore.rules` contra el emulador de Firestore (no toca la base real). |
+| `npm test` | Corre todos los tests (lógica del flujo + reglas). |
+| `npm run test:flujo` | Tests unitarios de la lógica pura del flujo (`src/services/flujoSolicitud.js`). No necesita Firebase. |
+| `npm run test:reglas` | Tests de `firestore.rules` contra el emulador de Firestore (no toca la base real). |
 
 `seed` necesita la clave de cuenta de servicio en `scripts/serviceAccountKey.json`, que se descarga en la consola de Firebase: Configuración del proyecto → Cuentas de servicio → Generar nueva clave privada. **Ese archivo es secreto y está en `.gitignore`.**
 
