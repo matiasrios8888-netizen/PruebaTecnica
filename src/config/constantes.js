@@ -34,6 +34,40 @@ export const COLECCIONES = Object.freeze({
  */
 export const LIMITE_BANDEJA = 200;
 
+/** Pestañas de la bandeja. */
+export const PESTANAS_BANDEJA = Object.freeze({
+  PENDIENTES: 'pendientes', // asignadas a mí
+  NUEVAS: 'nuevas', // asignadas a mí y todavía no abiertas
+  ENVIADAS: 'enviadas', // intervine y ya no están en mis manos
+  TODAS: 'todas', // todas las de la empresa (solo ROLES_VEN_TODAS)
+});
+
+export const NOMBRES_PESTANA = Object.freeze({
+  [PESTANAS_BANDEJA.PENDIENTES]: 'Pendientes',
+  [PESTANAS_BANDEJA.NUEVAS]: 'Nuevas',
+  [PESTANAS_BANDEJA.ENVIADAS]: 'Enviadas',
+  [PESTANAS_BANDEJA.TODAS]: 'Todas',
+});
+
+/** Criterios de orden de la bandeja. */
+export const ORDENES_BANDEJA = Object.freeze({
+  RECIENTES: 'recientes',
+  ANTIGUAS: 'antiguas',
+  INICIO_PROXIMO: 'inicioProximo',
+  INICIO_LEJANO: 'inicioLejano',
+  NUMERO_DESC: 'numeroDesc',
+  NUMERO_ASC: 'numeroAsc',
+});
+
+export const NOMBRES_ORDEN = Object.freeze({
+  [ORDENES_BANDEJA.RECIENTES]: 'Actualizadas recientemente',
+  [ORDENES_BANDEJA.ANTIGUAS]: 'Actualizadas hace más tiempo',
+  [ORDENES_BANDEJA.INICIO_PROXIMO]: 'Fecha de inicio (más próxima)',
+  [ORDENES_BANDEJA.INICIO_LEJANO]: 'Fecha de inicio (más lejana)',
+  [ORDENES_BANDEJA.NUMERO_DESC]: 'Número (mayor a menor)',
+  [ORDENES_BANDEJA.NUMERO_ASC]: 'Número (menor a mayor)',
+});
+
 /**
  * Numeración correlativa de las solicitudes ("SOL-0001").
  * El último número usado vive en contadores/{ID_CONTADOR}.ultimoNumero y se
@@ -57,6 +91,12 @@ export const ROLES = Object.freeze({
   RH: 'rh',
   ADMIN: 'admin',
 });
+
+/**
+ * 🔒 SEGURIDAD: roles que pueden ver TODAS las solicitudes (pestaña "Todas",
+ * reportes). firestore.rules aplica la misma lista en la regla de lectura.
+ */
+export const ROLES_VEN_TODAS = Object.freeze([ROLES.RH, ROLES.ADMIN]);
 
 /** Texto para mostrar de cada rol. */
 export const NOMBRES_ROL = Object.freeze({

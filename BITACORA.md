@@ -477,3 +477,26 @@ Construimos el flujo completo Solicitar → Aprobar → Gestionar RH de punta a 
   - Consulta con firebase-admin: confirma el `FAILED_PRECONDITION` mientras se construyen.
 - **Cómo probarlo:** en la consola de Firebase → Firestore → **Índices** → pestaña "Compuesto": aparecen los dos índices, primero "Compilando" y después "Habilitado".
 - **Pendientes o dudas:** la pantalla de la bandeja se construye en los próximos pasos.
+
+---
+
+## 2026-10-15 – Fase 3 – Paso: lógica pura de la bandeja
+
+- **Qué hicimos:** escribimos el módulo que decide qué pestañas ve cada usuario, qué va en cada una, y cómo se filtra, ordena y busca. Es puro (sin Firebase), así que lo cubrimos con 16 tests unitarios. Sumamos el caso de uso `cargarBandeja()` al servicio.
+- **Archivos creados o modificados:**
+  - `src/services/bandeja.js`:
+    - pestañas: `pestanasVisibles`, `armarPestanas`, `contarPestanas`;
+    - búsqueda y filtros: `normalizarTexto`, `coincideBusqueda`, `filtrarSolicitudes`;
+    - orden: `ordenarSolicitudes`, `procesarBandeja`.
+  - `src/services/solicitudesServicio.js`: `cargarBandeja()` hace 2 consultas en paralelo (3 para RH y admin) y avisa si se alcanzó el tope.
+  - `src/config/constantes.js`: `PESTANAS_BANDEJA`, `NOMBRES_PESTANA`, `ORDENES_BANDEJA`, `NOMBRES_ORDEN` y `ROLES_VEN_TODAS`.
+  - `scripts/tests/bandeja.test.mjs`: 16 tests (pestañas por rol, búsqueda sin tildes, filtros combinados, rango de fechas, orden).
+  - `scripts/package.json` y `README.md`: `test:flujo` pasa a llamarse `test:unitarios` e incluye los dos archivos de tests.
+- **Conceptos aprendidos:**
+  - **Normalización Unicode (NFD):** separa cada letra de su tilde ("ó" → "o" + "´") para poder borrar las tildes y comparar "Gómez" con "gomez".
+  - **Superposición de rangos:** dos períodos se pisan si uno empieza antes de que el otro termine y termina después de que el otro empiece (`fechaFin >= desde` y `fechaInicio <= hasta`).
+  - **Inmutabilidad:** `[...lista].sort()` ordena una copia, así la lista original (la que vino de Firestore) no cambia y se puede volver a filtrar.
+  - **Pestaña derivada:** "Nuevas" no necesita otra consulta: es un filtro sobre "Pendientes".
+- **Comandos usados:** `npm run test:unitarios` → 44 tests (28 del flujo + 16 de la bandeja).
+- **Cómo probarlo:** `cd scripts` y después `npm run test:unitarios`.
+- **Pendientes o dudas:** la pantalla de la bandeja va en el próximo paso. El inicio actual usa consultas que necesitan los índices compuestos, que tardan unos minutos en quedar habilitados después de publicarlos.

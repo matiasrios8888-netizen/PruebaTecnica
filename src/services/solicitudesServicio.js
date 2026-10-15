@@ -20,7 +20,15 @@
  * =============================================================
  */
 
-import { ACCIONES, ESTADOS_FINALES, LIMITES_ADJUNTO, ROLES } from '../config/constantes.js';
+import {
+  ACCIONES,
+  ESTADOS_FINALES,
+  LIMITE_BANDEJA,
+  LIMITES_ADJUNTO,
+  PESTANAS_BANDEJA,
+  ROLES,
+} from '../config/constantes.js';
+import { armarPestanas, pestanasVisibles } from './bandeja.js';
 import * as repositorio from '../data/solicitudesRepositorio.js';
 import { obtenerUsuarioPorId, listarUsuariosPorRol } from '../data/usuariosRepositorio.js';
 import { obtenerUsuarioActual } from './authServicio.js';
@@ -215,6 +223,35 @@ export async function obtenerDetalle(id) {
     };
   } catch (error) {
     throw errorParaUsuario(error, 'No se pudo cargar la solicitud.');
+  }
+}
+
+/**
+ * Carga la bandeja del usuario: una lista por pestaña visible para su rol.
+ * Hace 2 consultas (3 para RH y admin) en paralelo; filtros, orden y búsqueda
+ * se aplican después en el navegador con bandeja.js.
+ *
+ * @returns {Promise<{ pestanas: Record<string, Solicitud[]>, visibles: string[], limiteAlcanzado: boolean }>}
+ *   limiteAlcanzado = alguna consulta llegó a LIMITE_BANDEJA (puede haber más solicitudes).
+ * @throws {ErrorAplicacion}
+ */
+export async function cargarBandeja() {
+  try {
+    const usuario = usuarioRequerido();
+    const visibles = pestanasVisibles(usuario);
+    const [asignadas, participa, todas] = await Promise.all([
+      repositorio.listarAsignadasA(usuario.id),
+      repositorio.listarDondeParticipa(usuario.id),
+      // 🔒 SEGURIDAD: la consulta sin filtro solo se hace para RH y admin (las reglas la rechazarían).
+      visibles.includes(PESTANAS_BANDEJA.TODAS) ? repositorio.listarTodas() : null,
+    ]);
+    return {
+      pestanas: armarPestanas({ asignadas, participa, todas }, usuario),
+      visibles,
+      limiteAlcanzado: [asignadas, participa, todas].some((lista) => lista?.length >= LIMITE_BANDEJA),
+    };
+  } catch (error) {
+    throw errorParaUsuario(error, 'No se pudo cargar la bandeja.');
   }
 }
 
