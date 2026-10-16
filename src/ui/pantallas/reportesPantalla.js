@@ -5,8 +5,9 @@
  *
  * Responsabilidad:
  *   Reportes de gestión para RH y admin (DECISIONES.md #27):
- *   - indicadores generales (total, en curso, finalizados);
- *   - distribución de trámites por etapa (gráfico de barras + tabla de datos).
+ *   - indicadores generales (total, en curso, finalizados, tareas sin abrir);
+ *   - distribución de trámites por etapa (gráfico de barras + tabla de datos);
+ *   - carga de tareas pendientes por usuario (barras apiladas vistas/nuevas + tabla).
  *   El botón "Actualizar" vuelve a leer los datos; mientras tanto el reporte
  *   anterior queda a la vista, atenuado (sin saltos ni pantallas vacías).
  *
@@ -19,7 +20,7 @@ import { cargarReportes } from '../../services/reportesServicio.js';
 import { dibujarMarco } from '../componentes/marco.js';
 import { htmlGraficoBarras } from '../componentes/graficoBarras.js';
 import { escaparHtml } from '../utils/html.js';
-import { formatearMomento } from '../utils/formato.js';
+import { formatearMomento, nombreRol } from '../utils/formato.js';
 import { conectarTooltips } from '../utils/tooltip.js';
 
 /** "1 trámite" / "3 trámites". */
@@ -75,10 +76,11 @@ export function renderizarReportes(contenedor, usuario) {
  * @param {HTMLElement} contenido
  * @param {import('../../services/reportesServicio.js').Reportes} reportes
  */
-function dibujarReportes(contenido, { distribucion }) {
+function dibujarReportes(contenido, { distribucion, carga }) {
   contenido.innerHTML = `
-    ${htmlIndicadores(distribucion)}
+    ${htmlIndicadores(distribucion, carga)}
     ${htmlDistribucion(distribucion)}
+    ${htmlCarga(carga)}
   `;
 }
 
@@ -95,12 +97,13 @@ function htmlIndicador(etiqueta, valor, ayuda) {
     </div>`;
 }
 
-function htmlIndicadores(distribucion) {
+function htmlIndicadores(distribucion, carga) {
   return `
     <div class="indicadores">
       ${htmlIndicador('Trámites', distribucion.total, 'Todos los registrados')}
       ${htmlIndicador('En curso', distribucion.abiertos, 'Esperando a alguien')}
       ${htmlIndicador('Finalizados', distribucion.total - distribucion.abiertos, 'Completados, rechazados o cancelados')}
+      ${htmlIndicador('Sin abrir', carga.totalNuevas, 'Tareas que su responsable todavía no vio')}
     </div>`;
 }
 
@@ -161,6 +164,98 @@ function htmlDistribucion(distribucion) {
             <thead><tr><th>Etapa</th><th>Detalle por estado</th><th class="numero">Cantidad</th><th class="numero">%</th></tr></thead>
             <tbody>${filasTabla}</tbody>
             <tfoot><tr><th>Total</th><th></th><th class="numero">${distribucion.total}</th><th class="numero">${distribucion.total ? '100%' : '—'}</th></tr></tfoot>
+          </table>
+        </div>
+      </details>
+    </section>`;
+}
+
+/** Texto del trámite más antiguo de una bandeja. */
+function textoMasAntiguo(fila) {
+  if (!fila.masAntiguo) return 'Sin tareas pendientes';
+  const { numero, dias } = fila.masAntiguo;
+  const hace = dias === 0 ? 'de hoy' : `hace ${cantidadDe(dias, 'día', 'días')}`;
+  return `Más antiguo: ${numero} (${hace})`;
+}
+
+/**
+ * Carga de pendientes por usuario: una barra apilada por persona, con las
+ * tareas que ya vio (serie 1) y las nuevas, sin abrir (serie 2). Son dos
+ * series, así que lleva leyenda. Ordenada de mayor a menor carga.
+ */
+function htmlCarga(carga) {
+  const filas = carga.filas.map((fila) => {
+    const rol = fila.rol ? nombreRol(fila.rol) : 'Usuario inexistente';
+    const vistas = fila.pendientes - fila.nuevas;
+    return {
+      etiqueta: fila.nombre,
+      detalle: `${fila.activo ? rol : `${rol} · dado de baja`} · ${textoMasAntiguo(fila)}`,
+      textoValor: String(fila.pendientes),
+      segmentos: [
+        {
+          valor: vistas,
+          clase: 'serie--vistas',
+          tooltipValor: cantidadDe(vistas, 'tarea ya vista', 'tareas ya vistas'),
+          tooltipEtiqueta: fila.nombre,
+        },
+        {
+          valor: fila.nuevas,
+          clase: 'serie--nuevas',
+          tooltipValor: cantidadDe(fila.nuevas, 'tarea nueva', 'tareas nuevas'),
+          tooltipEtiqueta: `${fila.nombre} · todavía sin abrir`,
+        },
+      ],
+    };
+  });
+
+  // ⚠️ IMPORTANTE: no debería pasar (el mantenimiento bloquea la baja con trámites
+  // abiertos, DECISIONES.md #24), pero si pasa tiene que verse.
+  const problemas = carga.conProblemas.length
+    ? `<p class="mensaje-alerta" role="status">⚠ Hay trámites asignados a usuarios dados de baja o inexistentes:
+         ${escaparHtml(carga.conProblemas.map((f) => `${f.nombre} (${f.pendientes})`).join(', '))}.</p>`
+    : '';
+
+  const filasTabla = carga.filas
+    .map(
+      (fila) => `
+        <tr>
+          <td>${escaparHtml(fila.nombre)}</td>
+          <td>${escaparHtml(fila.rol ? nombreRol(fila.rol) : '—')}${fila.activo ? '' : ' (de baja)'}</td>
+          <td class="numero">${fila.pendientes}</td>
+          <td class="numero">${fila.nuevas}</td>
+          <td>${escaparHtml(fila.masAntiguo ? `${fila.masAntiguo.numero} · ${cantidadDe(fila.masAntiguo.dias, 'día', 'días')}` : '—')}</td>
+        </tr>`,
+    )
+    .join('');
+
+  return `
+    <section class="tarjeta tarjeta--ancha">
+      <h2 class="titulo--seccion">Carga de tareas pendientes por usuario</h2>
+      <p class="ayuda">
+        Trámites que esperan una acción de cada persona. También se muestran, con 0, los supervisores
+        y RH activos sin tareas.
+      </p>
+      ${problemas}
+      <ul class="leyenda" aria-label="Referencias">
+        <li><span class="leyenda__muestra serie--vistas"></span>Ya vistas</li>
+        <li><span class="leyenda__muestra serie--nuevas"></span>Nuevas (sin abrir)</li>
+      </ul>
+      ${
+        carga.filas.length === 0
+          ? '<p class="vacio">No hay tareas pendientes ni usuarios que puedan recibirlas.</p>'
+          : htmlGraficoBarras({ filas, descripcion: 'Tareas pendientes por usuario' })
+      }
+      <details class="datos-grafico">
+        <summary>Ver los datos en una tabla</summary>
+        <div class="tabla-contenedor">
+          <table class="tabla">
+            <thead>
+              <tr><th>Usuario</th><th>Rol</th><th class="numero">Pendientes</th><th class="numero">Nuevas</th><th>Más antiguo</th></tr>
+            </thead>
+            <tbody>${filasTabla}</tbody>
+            <tfoot>
+              <tr><th>Total</th><th></th><th class="numero">${carga.totalPendientes}</th><th class="numero">${carga.totalNuevas}</th><th></th></tr>
+            </tfoot>
           </table>
         </div>
       </details>

@@ -998,3 +998,34 @@ Construimos el mantenimiento de usuarios y roles para el administrador:
     - El desborde horizontal se midió en 7 anchos y todos dan 0, después de corregir el BUG-009.
 - **Cómo probarlo:** entrar con `rh@bprosys.test` o `admin@bprosys.test` → Reportes. Pasar el mouse por las barras, o recorrerlas con Tab, y abrir "Ver los datos en una tabla".
 - **Pendientes o dudas:** en el paso siguiente se suma la carga de pendientes por usuario.
+
+## 2026-10-15 – Fase 5 – Paso: carga de tareas pendientes por usuario
+
+- **Qué hicimos:** sumamos el segundo reporte del enunciado.
+  - **Barra apilada por persona:** las tareas que ya vio (azul) y las nuevas, todavía sin abrir (naranja), con el total al final.
+  - **Detalle debajo de cada nombre:** el rol y el trámite más antiguo de su bandeja ("Más antiguo: SOL-0006 (hace 10 días)").
+  - **Supervisores y RH sin tareas:** aparecen con 0; que alguien que aprueba esté libre también es información.
+  - **Leyenda:** son dos series, así que lleva leyenda, con la forma de las barras.
+  - **Datos y alertas:** tiene su tabla de datos y un aviso si algún trámite quedara asignado a alguien dado de baja.
+  - **Indicador nuevo:** "Sin abrir".
+- **Archivos creados o modificados:**
+  - `src/ui/pantallas/reportesPantalla.js`: `htmlCarga()`, el indicador "Sin abrir" y el texto del trámite más antiguo.
+  - `src/styles/main.css`: colores de las dos series (`--serie-1`, `--serie-2`), la leyenda y la alineación de los indicadores (`align-content: start`).
+- **Conceptos aprendidos:**
+  - **Barras apiladas (parte de un todo):** el largo total es la carga y los colores muestran de qué está hecha. Los segmentos se separan con 2 px de fondo, no con un borde.
+  - **Leyenda solo cuando hay más de una serie:** con una sola serie (las etapas) el título alcanza; con dos (vistas y nuevas), la leyenda es la forma confiable de saber qué es cada color. Además, el tooltip lo dice con palabras.
+  - **Un evento que depende del dibujado:** en la prueba automática el evento `scroll` no llegaba, ni siquiera a un listener de prueba, porque el navegador de pruebas no dibuja cuadros mientras está en segundo plano. La lógica se verificó disparando el evento a mano. No es un bug de la app.
+- **Comandos usados:** prueba en el navegador con el admin:
+  - **Con el seed:**
+    - Carlos tiene 3 (1 vista y 2 nuevas), Laura 3 (1 + 2), Ana 1 nueva y Sofía 0.
+    - "Sin abrir" da 5 y la tabla suma 7 pendientes y 5 nuevas.
+  - **Prueba dinámica, Carlos aprueba SOL-0002:**
+    - Laura pasa a 4 (1 vista y 3 nuevas) y Carlos a 2.
+    - En la distribución, Aprobación queda en 2 (20%) y Gestión RH en 4 (40%).
+    - "Sin abrir" pasa a 6.
+  - **Tooltip, desborde y alineación:**
+    - El tooltip funciona con el mouse ("3 tareas nuevas / Laura Fernández · todavía sin abrir") y con el teclado.
+    - Desborde horizontal 0 en 7 anchos, de 1440 a 320 px.
+    - Los 4 números de los indicadores quedan a la misma altura.
+- **Cómo probarlo:** entrar con `admin@bprosys.test` → Reportes. Después, entrar como `supervisor@bprosys.test`, aprobar un trámite, volver a Reportes y apretar "Actualizar": la carga pasa de Carlos a Laura.
+- **Pendientes o dudas:** queda la prueba integral, la documentación y el cierre. La prueba aprobó SOL-0002, así que se recargan los datos de prueba antes de cerrar.
