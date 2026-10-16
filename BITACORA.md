@@ -1029,3 +1029,31 @@ Construimos el mantenimiento de usuarios y roles para el administrador:
     - Los 4 números de los indicadores quedan a la misma altura.
 - **Cómo probarlo:** entrar con `admin@bprosys.test` → Reportes. Después, entrar como `supervisor@bprosys.test`, aprobar un trámite, volver a Reportes y apretar "Actualizar": la carga pasa de Carlos a Laura.
 - **Pendientes o dudas:** queda la prueba integral, la documentación y el cierre. La prueba aprobó SOL-0002, así que se recargan los datos de prueba antes de cerrar.
+
+## 2026-10-15 – Fase 5 – Paso: prueba integral y cierre
+
+- **Qué hicimos:** recargamos los datos de prueba, corrimos todos los tests, hicimos una prueba final en el navegador, actualizamos el README y cerramos la fase con el merge a `main`.
+- **Archivos creados o modificados:** `README.md`: Fase 5 ✅, qué muestran los reportes y quién los ve, y la estructura nueva.
+- **Conceptos aprendidos:**
+  - **Regresión de un cambio de CSS global:** la regla de la manito sobre las filas pasó a aplicarse solo a `tr[data-id]`. Se verificó que la bandeja y usuarios siguen mostrándola y abriendo el detalle, y que las tablas de datos de los reportes ya no la muestran.
+- **Comandos usados:**
+  - `npm run seed`: la prueba dinámica del paso anterior había aprobado SOL-0002.
+  - `npm test`: 91 unitarios y 73 de reglas, en verde.
+  - Prueba en el navegador:
+    - **RH ve los números del seed:** indicadores 10 / 7 / 3 / 5; etapas 1 / 3 / 3 / 3; carga Carlos 3, Laura 3, Ana 1 y Sofía 0.
+    - **Cursor de las tablas:** las filas de la bandeja y de usuarios muestran la manito y la bandeja abre el detalle; las de las tablas de datos, no.
+    - **Menú del admin:** Bandeja, Reportes, Usuarios, Roles.
+  - `git merge --no-ff feature/reportes` (en `main`) y `git push`.
+- **Cómo probarlo:** Live Server (Ctrl + F5) → entrar con `rh@bprosys.test` o `admin@bprosys.test` → Reportes.
+- **Pendientes o dudas:** `BUGS.md` tiene 0 bugs abiertos. Para la Fase 6 quedan anotados el modo oscuro de los gráficos (con su paleta validada para fondo oscuro) y la exportación de los reportes, si se quiere sumar.
+
+---
+
+## Resumen de la Fase 5
+
+Construimos los reportes de gestión para RH y admin:
+- **Distribución por etapa:** sale de consultas de conteo que Firestore resuelve en el servidor, sin enviar los documentos. El reporte cuesta lo mismo con 10 trámites que con 10.000.
+- **Carga por usuario:** descarga solo los trámites abiertos, la parte viva de los datos, y muestra por persona cuántas tareas tiene, cuántas no abrió y la más antigua.
+- **Gráficos:** están hechos en HTML y CSS sin librerías, siguiendo una guía de visualización de datos. Las paletas se validaron con un script de contraste y daltonismo, cada gráfico tiene su tabla de datos y el tooltip funciona con el teclado.
+- **Calidad:** la lógica está en un módulo puro con tests, y los tests de reglas comprueban que un supervisor no puede hacer estas consultas. Durante la fase apareció un desborde en celulares (BUG-009), que se corrigió en la misma rama antes del merge, con una medición automática en 7 anchos.
+- **Resultado:** 164 tests en verde.
