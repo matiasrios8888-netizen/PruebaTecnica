@@ -1140,3 +1140,33 @@ Construimos los reportes de gestión para RH y admin:
   - **Desborde:** 0 en 8 anchos, después del BUG-010.
 - **Cómo probarlo:** abrir la app (Ctrl + F5) → el login nuevo → "Entrar como Laura Fernández" → abrir una solicitud de la bandeja y ver el recorrido. Achicar la ventana para ver cómo se apila.
 - **Pendientes o dudas:** queda la revisión visual de todas las pantallas (claro, oscuro y celular) y medir el contraste.
+
+## 2026-10-15 – Fase 6 – Paso: revisión visual completa y contraste medido
+
+- **Qué hicimos:**
+  - Recorrimos las 9 pantallas de la app con el rol que corresponde a cada una (bandeja, nueva solicitud, detalle con y sin acciones, usuarios, alta, ficha, roles y reportes). En cada una medimos el desborde en 1280, 390 y 320 px y revisamos capturas en claro, oscuro y celular.
+  - **Contraste medido:** calculamos el contraste WCAG de los 46 pares de texto y fondo que usa la app, en los dos modos. Todos cumplen AA, y quedó como **test automático**.
+  - Lo que se vio en las capturas se corrigió.
+- **Archivos creados o modificados:**
+  - `scripts/tests/contraste.test.mjs` (nuevo): lee las variables de color de `main.css` y verifica cada par (4,5:1 para texto y 3:1 para bordes de campos y foco). Se probó al revés: con un gris demasiado claro, el test falla e indica qué par no cumple.
+  - `scripts/package.json`: suma el test a `test:unitarios`.
+  - `src/styles/main.css`:
+    - los campos no se estiran cuando el vecino de la fila tiene una ayuda (`align-content: start`);
+    - aire arriba de un título de sección que sigue a otro contenido;
+    - filtros de a dos por fila desde 390 px;
+    - botones de acción del mismo ancho;
+    - el botón del selector de archivos con el estilo de la app.
+- **Conceptos aprendidos:**
+  - **Contraste WCAG:** la relación entre la luminancia del texto y la del fondo. 4,5:1 es el mínimo para texto normal y 3:1 para lo que no es texto (bordes, foco). Se calcula con una fórmula, no a ojo.
+  - **`align-content: start` en una grilla:** sin esto, una fila de la grilla reparte su alto sobrante entre los elementos y un campo se estira para igualar a su vecino.
+  - **`::file-selector-button`:** permite darle estilo al botón del `<input type="file">` sin reemplazar el control nativo, que sigue siendo accesible.
+- **Comandos usados:**
+  - Script de contraste con el validador de la guía: 46/46 pares en AA.
+  - `npm run test:unitarios`: 94 tests (los 91 anteriores más 3 de contraste).
+  - Prueba en el navegador:
+    - 9 pantallas × 3 anchos, todas con desborde 0, y el título de pestaña correcto en cada una.
+    - Después de los arreglos: en la ficha, "Nombre" y "Email" quedan a la misma altura (43 px); los 3 botones de acción miden 196 px; a 390 px los filtros ocupan 366 px de alto, la mitad que antes.
+- **Cómo probarlo:**
+  - Desde `scripts/`, `npm run test:unitarios`.
+  - En el navegador, recorrer las pantallas en claro y oscuro, y con la ventana angosta.
+- **Pendientes o dudas:** una prueba "falló" porque se cambió de pantalla en los milisegundos en que Firebase todavía no había informado la sesión. Una persona no puede hacerlo, y un link directo funciona porque el router espera a la sesión antes de resolver la primera ruta. No es un bug de la app.

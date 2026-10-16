@@ -417,6 +417,10 @@ code {
   margin: 0 0 12px;
 }
 
+.titulo--seccion:not(:first-child) {
+  margin-top: 24px;
+}
+
 .subtitulo {
   margin: 0 0 24px;
   color: var(--color-texto-suave);
@@ -454,6 +458,7 @@ code {
 
 .campo {
   display: grid;
+  align-content: start; /* no se estira si el campo vecino de la fila es más alto */
   gap: 6px;
   font-size: 0.9rem;
   font-weight: 600;
@@ -787,7 +792,7 @@ code {
 
 .filtros {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr));
   gap: 12px;
   align-items: end;
   margin-bottom: 12px;
@@ -1000,6 +1005,10 @@ code {
   gap: 12px;
 }
 
+.panel-acciones .acciones--izquierda {
+  display: grid;
+}
+
 /* BUGS.md · BUG-007: en una grilla, cada elemento tiene min-width: auto, es decir,
    no se achica por debajo del ancho mínimo de su contenido. Un <textarea> o un
    <input type="file"> tienen un ancho propio (~300 px) que empujaba la tarjeta
@@ -1016,6 +1025,18 @@ code {
 
 input[type='file'] {
   max-width: 100%;
+}
+
+input[type='file']::file-selector-button {
+  font: inherit;
+  font-weight: 600;
+  margin-right: 12px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-borde-control);
+  border-radius: var(--radio-control);
+  background: var(--color-superficie);
+  color: var(--color-texto);
+  cursor: pointer;
 }
 
 .lista-adjuntos {
