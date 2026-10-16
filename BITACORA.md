@@ -1217,3 +1217,58 @@ Construimos los reportes de gestión para RH y admin:
   - `vercel link --yes --project permisos-bprosys`: crea el proyecto y lo conecta a GitHub. La línea que agregó al `.gitignore` se revirtió, porque `.vercel/` ya estaba ignorado.
 - **Cómo probarlo:** después del deploy, `curl -I <url>` muestra las cabeceras. En el navegador, la consola no tiene que mostrar "Refused to load…".
 - **Pendientes o dudas:** publicar en producción y verificar la app con los 4 roles en la URL pública.
+
+## 2026-10-15 – Fase 6 – Paso: deploy en producción, documentación final y cierre
+
+- **Qué hicimos:**
+  - Publicamos la app en **https://permisos-bprosys.vercel.app** y la probamos ahí con los 4 roles.
+  - Terminamos la documentación: README con el link, el diseño, las pruebas, el deploy y las posibles mejoras; la decisión 29; y el cierre de la OBS-003.
+  - Integramos todo a `main`, que publica producción automáticamente.
+- **Archivos creados o modificados:**
+  - `README.md`: link a la app, Fase 6 ✅, secciones "Diseño y accesibilidad", "Deploy (Vercel)" y "Posibles mejoras", la estructura nueva y la aclaración sobre los dominios autorizados de Firebase.
+  - `DECISIONES.md`: decisión 29.
+  - `BUGS.md`: OBS-003 verificada en producción.
+- **Conceptos aprendidos:**
+  - **Producción y versiones de prueba:** la rama de producción del proyecto es `main`. La URL propia de cada deploy queda protegida por el login de Vercel, y la dirección pública es la del proyecto.
+  - **Dominios autorizados de Firebase Auth:** solo se exigen para el ingreso con proveedores (Google y otros), redirecciones y links por mail. El ingreso con email y contraseña funciona desde cualquier dominio, por eso no hizo falta agregar el de Vercel.
+  - **Conversión de rutas en Git Bash:** un argumento como `/v9/projects` se convierte en una ruta de Windows. `MSYS_NO_PATHCONV=1` lo evita.
+- **Comandos usados:**
+  - `vercel ls` y `vercel inspect`: el primer deploy del proyecto salió de `feature/deploy` y quedó como producción.
+  - `vercel api /v9/projects/permisos-bprosys`: confirmó que la rama de producción es `main`.
+  - `curl -I`:
+    - la dirección pública responde 200, sin login, con la CSP, HSTS, `nosniff` y el caché con revalidación;
+    - los documentos internos (README, BITACORA, scripts, reglas, docs) dan 404 y los archivos del sitio, 200.
+  - Prueba en el navegador sobre la URL pública:
+    - los 4 roles entran con los botones de demostración;
+    - bandeja, detalle (SOL-0008 con las 4 etapas hechas), reportes (10 / 7 / 3 / 5), usuarios (6) y roles (4);
+    - al recargar se conserva la sesión y el link directo `#/usuarios` funciona;
+    - **0 errores y 0 violaciones de la CSP**.
+  - `git merge --no-ff feature/deploy` (en `main`) y `git push`: dispara el deploy de producción desde `main`.
+- **Cómo probarlo:** abrir https://permisos-bprosys.vercel.app y entrar con cualquiera de los botones de "Cuentas de demostración".
+- **Pendientes o dudas:** `BUGS.md` tiene 0 bugs abiertos. Las mejoras posibles están en el README.
+
+---
+
+## Resumen de la Fase 6
+
+Le dimos a la app una identidad visual propia, pensada para una herramienta que usa toda la empresa:
+- **Diseño:** una tipografía de máxima legibilidad, colores con un significado fijo y modo oscuro. El elemento distintivo es el recorrido del trámite, en el login y en el detalle.
+- **Accesibilidad:** medimos el contraste de los 46 pares de colores (todos cumplen WCAG AA, con un test automático) y el desborde de todas las pantallas desde 320 px. Corregimos un bug de diseño (BUG-010) en la misma rama, antes del merge.
+- **Pruebas:** escribimos y ejecutamos un guion de pruebas de punta a punta por rol (23 casos) y lo documentamos en `docs/PRUEBAS.md`.
+- **Publicación:** publicamos en Vercel, conectado a GitHub, con cabeceras de seguridad (una CSP probada antes de publicar) y caché con revalidación, y verificamos la app en producción con los 4 roles.
+
+---
+
+## Resumen del proyecto
+
+Construimos una aplicación web de solicitud y aprobación de permisos, sin frameworks ni bundler, sobre Firebase y publicada en Vercel.
+
+- **Flujo:** Solicitar → Aprobar → Gestionar RH, con devoluciones, cancelaciones, adjuntos, notas y un historial append-only. Cada cambio queda enlazado con su evento, así que la trazabilidad no se puede saltear.
+- **Bandeja:** pestañas Pendientes, Nuevas, Enviadas y Todas, con búsqueda, filtros y orden. Los campos son editables, de solo lectura u ocultos según una matriz por rol.
+- **Mantenimiento:** usuarios con alta (sin cerrar la sesión del admin), edición, baja lógica bloqueada mientras haya trámites en curso, y roles. **Reportes:** distribución por etapa y carga de pendientes por usuario.
+- **Seguridad en tres capas:** la UI (lo que se muestra), los servicios (lo que se permite) y `firestore.rules` (lo que el servidor acepta, sin que se pueda saltear).
+- **Calidad:**
+  - 167 tests automáticos: lógica, 73 de reglas contra el emulador y contraste;
+  - un guion de pruebas por rol;
+  - 10 bugs registrados y corregidos con ramas `fix/`;
+  - 29 decisiones técnicas documentadas con sus alternativas.

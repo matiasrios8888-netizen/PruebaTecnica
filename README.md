@@ -4,7 +4,7 @@ Aplicación web de **solicitud y aprobación de permisos** de los colaboradores 
 
 Prueba técnica para Bprosys.
 
-- **Deploy:** _pendiente (Fase 6, Vercel)_
+- **App publicada:** **https://permisos-bprosys.vercel.app** (el login tiene un botón por rol para entrar con las cuentas de demostración)
 - **Stack:** HTML, CSS y JavaScript vanilla (ES modules, sin bundler) · Firebase Authentication · Cloud Firestore · Vercel
 
 ## Estado
@@ -16,9 +16,9 @@ Prueba técnica para Bprosys.
 | 3 | Bandeja (pendientes / enviadas / nuevas, filtros, orden, búsqueda) y control de campos por rol | ✅ |
 | 4 | Mantenimiento de usuarios y roles | ✅ |
 | 5 | Reportes de gestión | ✅ |
-| 6 | Diseño final, pruebas por rol, deploy y documentación | ⏳ |
+| 6 | Diseño final, pruebas por rol, deploy y documentación | ✅ |
 
-## Qué se puede hacer hoy
+## Qué se puede hacer
 
 - **Iniciador:** crear solicitudes (6 tipos de permiso, con días máximos y adjunto obligatorio según el tipo), adjuntar archivos, agregar notas, cancelar mientras no fue aprobada y corregir y reenviar una solicitud devuelta.
 - **Supervisor:** aprobar, devolver (con motivo obligatorio) o rechazar las solicitudes de su equipo.
@@ -37,6 +37,19 @@ Prueba técnica para Bprosys.
   - **Bloqueos:** la baja y el cambio de rol se bloquean, con los motivos a la vista, mientras el usuario participe en trámites abiertos, sea supervisor de colaboradores activos, sea el último RH activo o sea el propio admin.
   - **Roles:** los 4 roles del sistema con sus permisos (solo lectura). Se editan el nombre visible (que se ve en toda la app) y la descripción. "Crear rol" solo vuelve a crear uno de los 4 si falta en la base.
 
+## Diseño y accesibilidad
+
+- **Identidad propia:**
+  - tipografía Atkinson Hyperlegible Next (pensada para leerse bien en cualquier pantalla);
+  - azul tinta para la marca y azul de acción para botones y enlaces;
+  - el naranja significa siempre "nueva / sin abrir".
+- **El recorrido del trámite** (Solicitud → Aprobación → Gestión RH → Finalizada) explica la app en el login y muestra en el detalle en qué etapa está cada solicitud.
+- **Modo oscuro** según la configuración del sistema operativo.
+- **Pantallas angostas:** funciona desde 320 px, sin scroll horizontal (se mide en todas las pantallas).
+- **Contraste y teclado:** el contraste de todos los colores cumple WCAG AA (lo verifica un test automático); hay foco visible, un título de pestaña por pantalla y tablas de datos en los gráficos.
+
+Detalle en [DECISIONES.md](DECISIONES.md) (#28) y el resultado de las pruebas en [docs/PRUEBAS.md](docs/PRUEBAS.md).
+
 ## Arquitectura
 
 ```
@@ -52,6 +65,8 @@ Prueba técnica para Bprosys.
 
 ```
 index.html                  Página única (SPA con router por hash)
+favicon.svg                 Ícono de la app
+vercel.json                 Cabeceras de seguridad (CSP) y de caché del sitio publicado
 src/
   main.js                   Punto de entrada: observa la sesión y resuelve la ruta
   config/
@@ -78,6 +93,7 @@ firestore.rules             Reglas de seguridad
 firestore.indexes.json      Índices compuestos (bandeja: asignadoA y participantes + fecha)
 scripts/                    Herramientas de Node (no se publican): datos de prueba y tests (lógica + reglas)
 docs/MODELO_DATOS.md        Colecciones, campos, tipos y ejemplos
+docs/PRUEBAS.md             Tests automáticos, guion de pruebas por rol y controles de accesibilidad
 DECISIONES.md               Decisiones técnicas con alternativas y justificación
 BITACORA.md                 Registro paso a paso de la construcción
 BUGS.md                     Registro de bugs y observaciones (se resuelven antes de cada fase)
@@ -115,7 +131,7 @@ npx serve .
 ```
 y abrir `http://localhost:3000`.
 
-`localhost` ya es un dominio autorizado en Firebase Authentication.
+El ingreso con email y contraseña funciona desde cualquier dominio (los "dominios autorizados" de Firebase Authentication se usan para el ingreso con Google, redirecciones y links por mail, que esta app no usa).
 
 ## Scripts (carpeta `scripts/`)
 
@@ -131,8 +147,8 @@ npm install
 | `npm run seed:simular` | Valida los datos de prueba y la conexión **sin escribir nada**. |
 | `npm run seed` | Crea o actualiza los 6 usuarios de prueba, los 4 roles y 10 solicitudes con historial y adjuntos. Es idempotente. No cambia la contraseña de los usuarios que ya existen (así no cierra sus sesiones). |
 | `npm run seed:restablecer-claves` | Igual que `seed`, pero además vuelve a poner la contraseña común a los usuarios existentes (cierra sus sesiones abiertas). |
-| `npm test` | Corre todos los tests (unitarios + reglas). |
-| `npm run test:unitarios` | Tests de la lógica pura: flujo, bandeja, mantenimiento de usuarios, gestión de roles y reportes. No necesita Firebase. |
+| `npm test` | Corre todos los tests (167: unitarios + reglas). |
+| `npm run test:unitarios` | Tests de la lógica pura (flujo, bandeja, mantenimiento de usuarios, gestión de roles y reportes) y del contraste de colores. No necesita Firebase. |
 | `npm run test:reglas` | Tests de `firestore.rules` contra el emulador de Firestore (no toca la base real). |
 
 `seed` necesita la clave de cuenta de servicio en `scripts/serviceAccountKey.json`, que se descarga en la consola de Firebase: Configuración del proyecto → Cuentas de servicio → Generar nueva clave privada. **Ese archivo es secreto y está en `.gitignore`.**
@@ -144,3 +160,23 @@ Para publicar las reglas y los índices (requiere `firebase login`):
 firebase deploy --only firestore:rules,firestore:indexes
 ```
 Para validarlas sin publicar: `firebase deploy --only firestore:rules --dry-run`.
+
+## Deploy (Vercel)
+
+El proyecto de Vercel (`permisos-bprosys`) está conectado al repositorio de GitHub:
+- **Cada push a `main` publica la versión de producción** en https://permisos-bprosys.vercel.app.
+- **Cada push a otra rama** genera una versión de prueba (*preview*), protegida con el login de Vercel.
+
+Es un sitio estático: no hay paso de build. Qué se publica y cómo:
+- **`.vercelignore`** deja afuera los scripts, las reglas, los logs y la documentación; se publican solo `index.html`, `favicon.svg`, `vercel.json` y `src/`.
+- **`vercel.json`** agrega las cabeceras de seguridad (Content Security Policy, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, HSTS) y `Cache-Control: max-age=0, must-revalidate`, para que el navegador nunca muestre una versión vieja después de un cambio.
+
+Para publicar a mano desde la terminal (con [Vercel CLI](https://vercel.com/docs/cli) y la sesión iniciada): `vercel deploy --prod`.
+
+## Posibles mejoras
+
+- **Paginar la bandeja** cuando una lista supere las 200 solicitudes (hoy se avisa).
+- **Contraseña inicial:** obligar a cambiarla en el primer ingreso.
+- **Reportes:** exportarlos a CSV y filtrarlos por fechas.
+- **Clave de la API:** restringir la clave pública de Firebase a los dominios de la app desde Google Cloud (los datos ya están protegidos por las reglas).
+- **Cuentas de demostración:** en una instalación real, apagarlas (`MOSTRAR_CUENTAS_DEMO = false`) y no cargar los datos de prueba.
