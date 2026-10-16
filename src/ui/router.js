@@ -39,6 +39,9 @@ export const RUTA_NUEVO_USUARIO = '#/usuarios/nuevo';
 export const RUTA_FICHA_USUARIO = '#/usuarios/:id';
 export const RUTA_ROLES = '#/roles';
 
+/** Reportes de gestión (RH y admin). */
+export const RUTA_REPORTES = '#/reportes';
+
 /**
  * Arma el hash de la ficha de un usuario.
  * @param {string} id - uid del usuario.

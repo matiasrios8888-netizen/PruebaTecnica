@@ -15,7 +15,7 @@
  */
 
 import { observarSesion, obtenerUsuarioActual } from './services/authServicio.js';
-import { ROLES } from './config/constantes.js';
+import { ROLES, ROLES_VEN_REPORTES } from './config/constantes.js';
 import {
   registrarRuta,
   iniciarRouter,
@@ -30,6 +30,7 @@ import {
   RUTA_NUEVO_USUARIO,
   RUTA_FICHA_USUARIO,
   RUTA_ROLES,
+  RUTA_REPORTES,
 } from './ui/router.js';
 import { renderizarLogin } from './ui/pantallas/loginPantalla.js';
 import { renderizarBandeja } from './ui/pantallas/bandejaPantalla.js';
@@ -39,6 +40,7 @@ import { renderizarUsuarios } from './ui/pantallas/usuariosPantalla.js';
 import { renderizarAltaUsuario } from './ui/pantallas/altaUsuarioPantalla.js';
 import { renderizarFichaUsuario } from './ui/pantallas/fichaUsuarioPantalla.js';
 import { renderizarRoles } from './ui/pantallas/rolesPantalla.js';
+import { renderizarReportes } from './ui/pantallas/reportesPantalla.js';
 import { limpiarAvisos } from './ui/utils/avisos.js';
 
 const contenedor = document.getElementById('app');
@@ -56,6 +58,8 @@ registrarRuta(RUTA_USUARIOS, renderizarUsuarios, { roles: [ROLES.ADMIN] });
 registrarRuta(RUTA_NUEVO_USUARIO, renderizarAltaUsuario, { roles: [ROLES.ADMIN] });
 registrarRuta(RUTA_FICHA_USUARIO, renderizarFichaUsuario, { roles: [ROLES.ADMIN] });
 registrarRuta(RUTA_ROLES, renderizarRoles, { roles: [ROLES.ADMIN] });
+// 🔒 SEGURIDAD: los reportes son de RH y admin (también lo exigen el servicio y las reglas).
+registrarRuta(RUTA_REPORTES, renderizarReportes, { roles: [...ROLES_VEN_REPORTES] });
 
 iniciarRouter(contenedor, obtenerUsuarioActual);
 

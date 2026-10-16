@@ -237,3 +237,20 @@ Registro de las decisiones importantes del proyecto: qué decidimos, qué altern
   - Comprobar la contraseña antes de completar un alta evita que alguien "adopte" una cuenta ajena que tenga ese email.
   - Una cuenta sin perfil no puede hacer nada (decisión 14), así que el estado intermedio no es un riesgo de seguridad.
 - **Límite:** no se obliga a cambiar la contraseña inicial en el primer ingreso. Haría falta un campo más en el perfil y una pantalla de cambio de contraseña; queda como mejora.
+
+## 27. Reportes: conteo en el servidor para la distribución y trámites abiertos para la carga
+
+- **Decisión:**
+  - **Distribución por etapa:** se calcula con **consultas de conteo** de Firestore (`getCountFromServer`), una por estado. Cada estado pertenece a una sola etapa (`ETAPA_DE_ESTADO`), así que la etapa se obtiene sumando.
+  - **Carga por usuario:** se descargan solo los trámites **abiertos** (`estadoActual in [enAprobacion, devuelta, enGestionRh]`) y se agrupan por `asignadoA` en el navegador.
+  - La lógica de los dos reportes está en un módulo puro y testeado (`reportes.js`).
+- **Alternativas:**
+  - Descargar todas las solicitudes y contar en el navegador.
+  - Mantener contadores precalculados (un documento de estadísticas actualizado en cada transición).
+  - Una consulta de conteo por usuario para la carga.
+- **Por qué:**
+  - El histórico (los finalizados) crece sin límite. Contarlo en el servidor cuesta 1 lectura cada 1.000 documentos y no descarga nada, así que el reporte no se encarece con el tiempo.
+  - Los abiertos son la parte "viva" y acotada de los datos. De ellos hace falta detalle (si la persona ya la abrió y la antigüedad), y una sola consulta alcanza para todos los usuarios.
+  - Los contadores precalculados obligarían a tocar cada transición y sus reglas, y suman un punto donde los números se pueden desincronizar.
+  - Ninguna de las dos consultas necesita índices compuestos, ni cambios en las reglas: RH y admin ya pueden leer todas las solicitudes.
+- **Límite conocido:** las consultas de conteo y la de abiertos se hacen casi al mismo tiempo, pero no en una transacción. Si alguien aprueba un trámite justo en ese instante, los dos reportes pueden diferir en 1. La pantalla muestra la hora del reporte y tiene un botón para actualizarlo.

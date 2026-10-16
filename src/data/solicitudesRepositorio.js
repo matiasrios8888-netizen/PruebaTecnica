@@ -24,6 +24,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  getCountFromServer,
   collection,
   query,
   where,
@@ -33,7 +34,7 @@ import {
   updateDoc,
   serverTimestamp,
 } from '../config/firebase.js';
-import { COLECCIONES, LIMITE_BANDEJA, NUMERACION_SOLICITUD } from '../config/constantes.js';
+import { COLECCIONES, ESTADOS_ABIERTOS, LIMITE_BANDEJA, NUMERACION_SOLICITUD } from '../config/constantes.js';
 
 /** @typedef {import('./modelos.js').Solicitud} Solicitud */
 /** @typedef {import('./modelos.js').EventoHistorial} EventoHistorial */
@@ -152,6 +153,38 @@ export async function listarParticipacionesDe(uid) {
  */
 export function listarTodas() {
   return consultarBandeja();
+}
+
+// -------------------------------------------------------------
+// Reportes (solo RH y admin)
+// -------------------------------------------------------------
+
+/**
+ * Cuántas solicitudes hay en un estado, contadas EN EL SERVIDOR.
+ *
+ * ⚠️ IMPORTANTE: es una consulta de agregación (count()): Firestore devuelve solo
+ * el número, sin enviar los documentos. Cuesta 1 lectura cada 1.000 documentos
+ * contados, así que el reporte no se encarece cuando el histórico crece.
+ * 🔒 SEGURIDAD: firestore.rules solo permite contar todas las solicitudes a RH y admin.
+ * No necesita índice compuesto: es una sola condición de igualdad.
+ * @param {string} estado - Una de ESTADOS.
+ * @returns {Promise<number>}
+ */
+export async function contarPorEstado(estado) {
+  const resultado = await getCountFromServer(query(coleccionSolicitudes(), where('estadoActual', '==', estado)));
+  return resultado.data().count;
+}
+
+/**
+ * Todas las solicitudes en curso (las que tienen a alguien asignado), para el
+ * reporte de carga por usuario. Son la parte "viva" de los datos: se descargan
+ * porque hace falta su detalle (asignado, si la vio, antigüedad).
+ * 🔒 SEGURIDAD: solo RH y admin pueden hacer esta consulta.
+ * @returns {Promise<Solicitud[]>}
+ */
+export async function listarAbiertas() {
+  const resultado = await getDocs(query(coleccionSolicitudes(), where('estadoActual', 'in', [...ESTADOS_ABIERTOS])));
+  return resultado.docs.map(conId);
 }
 
 // -------------------------------------------------------------

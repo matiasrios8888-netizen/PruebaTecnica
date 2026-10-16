@@ -927,3 +927,133 @@ Construimos el mantenimiento de usuarios y roles para el administrador:
 - **Roles:** son los 4 que conoce el flujo. El admin edita su nombre y descripción y puede volver a crear uno que se pierda, siempre con sus permisos de fábrica.
 - **Calidad:** la lógica es pura y testeada, y las reglas de Firestore suman lo que el servidor puede garantizar. Terminamos con 151 tests en verde.
 - **Proceso:** encontramos y corregimos un bug en código ya publicado (BUG-008) y un error de proceso (OBS-005) con el flujo de ramas `fix/`, sin tocar `main` directamente.
+
+---
+
+## 2026-10-15 – Fase 5 – Paso: lógica de los reportes, consultas y tests
+
+- **Qué hicimos:** preparamos todo lo que necesitan los dos reportes de gestión antes de dibujarlos (decisión 27).
+  - **Distribución por etapa:** se arma sumando conteos por estado, que Firestore cuenta en el servidor sin enviar los documentos.
+  - **Carga por usuario:** se arma agrupando los trámites abiertos por persona asignada: pendientes, nuevas (sin abrir) y el trámite más antiguo de cada bandeja.
+  - **Problemas:** el reporte marca si algún trámite quedó asignado a alguien dado de baja o inexistente.
+- **Archivos creados o modificados:**
+  - `src/config/constantes.js`:
+    - `ESTADOS_ABIERTOS`;
+    - `ETAPA_DE_ESTADO`, la etapa de cada estado;
+    - `ROLES_VEN_REPORTES` (RH y admin).
+  - `src/services/reportes.js` (nuevo, puro): `distribucionPorEtapa()` y `cargaPorUsuario()`.
+  - `src/data/solicitudesRepositorio.js`: `contarPorEstado()` (consulta de conteo) y `listarAbiertas()`.
+  - `src/config/firebase.js`: reexporta `getCountFromServer`.
+  - `scripts/tests/reportes.test.mjs` (nuevo): 9 tests. Uno verifica que `ETAPA_DE_ESTADO` coincida con `TRANSICIONES`.
+  - `scripts/tests/reglas.test.mjs`: 4 tests de las consultas de los reportes y la importación de `assert`.
+  - `scripts/package.json`: suma `reportes.test.mjs` a `test:unitarios`.
+  - `DECISIONES.md`: decisión 27.
+- **Conceptos aprendidos:**
+  - **Consulta de agregación (`count()`):** le pide a Firestore solo el número de documentos que cumplen una condición. No viajan los documentos y cuesta 1 lectura cada 1.000 contados.
+  - **Las reglas también se aplican a los conteos:** contar es leer. Un supervisor no puede contar todas las solicitudes, por la misma razón por la que no puede listarlas.
+  - **Un test que vigila dos tablas:** `ETAPA_DE_ESTADO` repite información de `TRANSICIONES`. El test las compara, así que si alguien cambia una y se olvida de la otra, falla.
+- **Comandos usados:**
+  - `git switch -c feature/reportes`.
+  - `npm run test:unitarios`: 91, 9 nuevos.
+  - `npm run test:reglas`: 73, 4 nuevos. Con los datos de los tests, RH cuenta 3 en aprobación y admin lista 5 abiertos.
+- **Cómo probarlo:** desde `scripts/`, correr `npm test`.
+- **Pendientes o dudas:** la pantalla de reportes se hace en los pasos siguientes.
+
+## 2026-10-15 – Fase 5 – Paso: pantalla de reportes y distribución por etapa
+
+- **Qué hicimos:**
+  - RH y admin tienen un enlace nuevo, "Reportes", con:
+    - **tres indicadores:** total de trámites, en curso y finalizados;
+    - **el gráfico de distribución por etapa:** barras horizontales en el orden del proceso, con el valor y el porcentaje al final de cada barra y el detalle por estado debajo de cada etapa;
+    - **la tabla de datos** desplegable, como alternativa accesible.
+  - **Tooltip:** cada barra lo muestra con el mouse y con el teclado (Tab).
+  - **Actualizar:** el botón vuelve a leer los datos; mientras tanto, el reporte anterior queda atenuado, sin saltos.
+  - **Diseño:** seguimos la guía de visualización de datos. Primero elegimos la forma (barras horizontales), después el color: las etapas tienen un orden, así que llevan una escala de un solo tono, de claro a oscuro. Por último **validamos la paleta con un script** en vez de elegirla a ojo.
+- **Archivos creados o modificados:**
+  - `src/services/reportesServicio.js` (nuevo): `cargarReportes()`. Hace en paralelo 6 conteos, los abiertos y los usuarios. Solo para RH y admin.
+  - `src/ui/componentes/graficoBarras.js` (nuevo): gráfico de barras horizontales en HTML y CSS, sin librerías, con segmentos apilables.
+  - `src/ui/utils/tooltip.js` (nuevo): tooltip con mouse y teclado, contenido con `textContent` y un solo listener de scroll para toda la app.
+  - `src/ui/pantallas/reportesPantalla.js` (nuevo).
+  - `src/ui/utils/formato.js`: `formatearMomento()`, para una fecha y hora del navegador.
+  - `src/ui/router.js`, `src/main.js` y `src/ui/componentes/marco.js`: ruta `#/reportes` para RH y admin, y el enlace en el menú.
+  - `src/styles/main.css`:
+    - colores de los gráficos como variables;
+    - indicadores, barras, tooltip y tabla de datos;
+    - solo las filas con `data-id` (las que abren algo) muestran la manito;
+    - corrección del BUG-009.
+  - `BUGS.md`: BUG-009.
+- **Conceptos aprendidos:**
+  - **Escala ordinal:** cuando las categorías tienen un orden (las etapas de un proceso), el color puede mostrar ese orden con un solo tono, de claro a oscuro. Si no tuvieran orden, todas las barras irían del mismo color.
+  - **Validar colores con un script:** el validador revisa que los tonos se distingan también con daltonismo y que tengan contraste suficiente contra el fondo. "Se ven distintos" no alcanza.
+  - **Gráficos accesibles:** el texto nunca va en el color de la serie, cada valor también está escrito o en la tabla, y el tooltip funciona con el teclado.
+  - **Delegación de eventos:** el tooltip escucha en el contenedor y usa `closest('[data-tooltip-valor]')`. Un solo listener sirve aunque las barras se vuelvan a dibujar.
+- **Comandos usados:**
+  - `node scripts/validate_palette.js "#86b6ef,#3987e5,#1c5cab,#0d366b" --ordinal --surface "#ffffff"`: todo PASS.
+  - `node scripts/validate_palette.js "#2a78d6,#eb6834" --surface "#ffffff"`: todo PASS, con una diferencia con daltonismo de ΔE 24,7.
+  - Prueba en el navegador:
+    - Carlos no ve "Reportes", y `#/reportes` lo lleva a la bandeja.
+    - Laura ve 10 / 7 / 3, y por etapa 1 (10%), 3, 3 y 3 (30%), con "Completada 2 · Rechazada 1". Coincide con el seed.
+    - El tooltip funciona con el mouse y con el teclado, la tabla también suma 10 y "Actualizar" funciona.
+    - Sin errores en la consola. Se corrigió el doble punto de "p. m..".
+    - El desborde horizontal se midió en 7 anchos y todos dan 0, después de corregir el BUG-009.
+- **Cómo probarlo:** entrar con `rh@bprosys.test` o `admin@bprosys.test` → Reportes. Pasar el mouse por las barras, o recorrerlas con Tab, y abrir "Ver los datos en una tabla".
+- **Pendientes o dudas:** en el paso siguiente se suma la carga de pendientes por usuario.
+
+## 2026-10-15 – Fase 5 – Paso: carga de tareas pendientes por usuario
+
+- **Qué hicimos:** sumamos el segundo reporte del enunciado.
+  - **Barra apilada por persona:** las tareas que ya vio (azul) y las nuevas, todavía sin abrir (naranja), con el total al final.
+  - **Detalle debajo de cada nombre:** el rol y el trámite más antiguo de su bandeja ("Más antiguo: SOL-0006 (hace 10 días)").
+  - **Supervisores y RH sin tareas:** aparecen con 0; que alguien que aprueba esté libre también es información.
+  - **Leyenda:** son dos series, así que lleva leyenda, con la forma de las barras.
+  - **Datos y alertas:** tiene su tabla de datos y un aviso si algún trámite quedara asignado a alguien dado de baja.
+  - **Indicador nuevo:** "Sin abrir".
+- **Archivos creados o modificados:**
+  - `src/ui/pantallas/reportesPantalla.js`: `htmlCarga()`, el indicador "Sin abrir" y el texto del trámite más antiguo.
+  - `src/styles/main.css`: colores de las dos series (`--serie-1`, `--serie-2`), la leyenda y la alineación de los indicadores (`align-content: start`).
+- **Conceptos aprendidos:**
+  - **Barras apiladas (parte de un todo):** el largo total es la carga y los colores muestran de qué está hecha. Los segmentos se separan con 2 px de fondo, no con un borde.
+  - **Leyenda solo cuando hay más de una serie:** con una sola serie (las etapas) el título alcanza; con dos (vistas y nuevas), la leyenda es la forma confiable de saber qué es cada color. Además, el tooltip lo dice con palabras.
+  - **Un evento que depende del dibujado:** en la prueba automática el evento `scroll` no llegaba, ni siquiera a un listener de prueba, porque el navegador de pruebas no dibuja cuadros mientras está en segundo plano. La lógica se verificó disparando el evento a mano. No es un bug de la app.
+- **Comandos usados:** prueba en el navegador con el admin:
+  - **Con el seed:**
+    - Carlos tiene 3 (1 vista y 2 nuevas), Laura 3 (1 + 2), Ana 1 nueva y Sofía 0.
+    - "Sin abrir" da 5 y la tabla suma 7 pendientes y 5 nuevas.
+  - **Prueba dinámica, Carlos aprueba SOL-0002:**
+    - Laura pasa a 4 (1 vista y 3 nuevas) y Carlos a 2.
+    - En la distribución, Aprobación queda en 2 (20%) y Gestión RH en 4 (40%).
+    - "Sin abrir" pasa a 6.
+  - **Tooltip, desborde y alineación:**
+    - El tooltip funciona con el mouse ("3 tareas nuevas / Laura Fernández · todavía sin abrir") y con el teclado.
+    - Desborde horizontal 0 en 7 anchos, de 1440 a 320 px.
+    - Los 4 números de los indicadores quedan a la misma altura.
+- **Cómo probarlo:** entrar con `admin@bprosys.test` → Reportes. Después, entrar como `supervisor@bprosys.test`, aprobar un trámite, volver a Reportes y apretar "Actualizar": la carga pasa de Carlos a Laura.
+- **Pendientes o dudas:** queda la prueba integral, la documentación y el cierre. La prueba aprobó SOL-0002, así que se recargan los datos de prueba antes de cerrar.
+
+## 2026-10-15 – Fase 5 – Paso: prueba integral y cierre
+
+- **Qué hicimos:** recargamos los datos de prueba, corrimos todos los tests, hicimos una prueba final en el navegador, actualizamos el README y cerramos la fase con el merge a `main`.
+- **Archivos creados o modificados:** `README.md`: Fase 5 ✅, qué muestran los reportes y quién los ve, y la estructura nueva.
+- **Conceptos aprendidos:**
+  - **Regresión de un cambio de CSS global:** la regla de la manito sobre las filas pasó a aplicarse solo a `tr[data-id]`. Se verificó que la bandeja y usuarios siguen mostrándola y abriendo el detalle, y que las tablas de datos de los reportes ya no la muestran.
+- **Comandos usados:**
+  - `npm run seed`: la prueba dinámica del paso anterior había aprobado SOL-0002.
+  - `npm test`: 91 unitarios y 73 de reglas, en verde.
+  - Prueba en el navegador:
+    - **RH ve los números del seed:** indicadores 10 / 7 / 3 / 5; etapas 1 / 3 / 3 / 3; carga Carlos 3, Laura 3, Ana 1 y Sofía 0.
+    - **Cursor de las tablas:** las filas de la bandeja y de usuarios muestran la manito y la bandeja abre el detalle; las de las tablas de datos, no.
+    - **Menú del admin:** Bandeja, Reportes, Usuarios, Roles.
+  - `git merge --no-ff feature/reportes` (en `main`) y `git push`.
+- **Cómo probarlo:** Live Server (Ctrl + F5) → entrar con `rh@bprosys.test` o `admin@bprosys.test` → Reportes.
+- **Pendientes o dudas:** `BUGS.md` tiene 0 bugs abiertos. Para la Fase 6 quedan anotados el modo oscuro de los gráficos (con su paleta validada para fondo oscuro) y la exportación de los reportes, si se quiere sumar.
+
+---
+
+## Resumen de la Fase 5
+
+Construimos los reportes de gestión para RH y admin:
+- **Distribución por etapa:** sale de consultas de conteo que Firestore resuelve en el servidor, sin enviar los documentos. El reporte cuesta lo mismo con 10 trámites que con 10.000.
+- **Carga por usuario:** descarga solo los trámites abiertos, la parte viva de los datos, y muestra por persona cuántas tareas tiene, cuántas no abrió y la más antigua.
+- **Gráficos:** están hechos en HTML y CSS sin librerías, siguiendo una guía de visualización de datos. Las paletas se validaron con un script de contraste y daltonismo, cada gráfico tiene su tabla de datos y el tooltip funciona con el teclado.
+- **Calidad:** la lógica está en un módulo puro con tests, y los tests de reglas comprueban que un supervisor no puede hacer estas consultas. Durante la fase apareció un desborde en celulares (BUG-009), que se corrigió en la misma rama antes del merge, con una medición automática en 7 anchos.
+- **Resultado:** 164 tests en verde.

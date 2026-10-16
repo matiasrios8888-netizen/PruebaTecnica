@@ -392,11 +392,12 @@ a {
   font-weight: 600;
 }
 
-.tabla tbody tr {
+/* Solo las filas que abren algo (bandeja, usuarios) tienen data-id y se pueden clickear. */
+.tabla tbody tr[data-id] {
   cursor: pointer;
 }
 
-.tabla tbody tr:hover {
+.tabla tbody tr[data-id]:hover {
   background: var(--color-fondo);
 }
 
@@ -664,4 +665,209 @@ input[type='file'] {
   display: grid;
   gap: 2px;
   font-size: 0.9rem;
+}
+
+/* ---------- Reportes ---------- */
+
+/* Colores de los gráficos (validados con el validador de paletas sobre fondo blanco):
+   - etapas: escala ordinal de un solo tono (más oscuro = más avanzado en el proceso);
+   - series: dos colores categóricos bien distinguibles también con daltonismo. */
+.reportes {
+  --etapa-1: #86b6ef;
+  --etapa-2: #3987e5;
+  --etapa-3: #1c5cab;
+  --etapa-4: #0d366b;
+  --serie-1: #2a78d6;
+  --serie-2: #eb6834;
+  --grafico-eje: #c3c2b7;
+  display: grid;
+  gap: 16px;
+  transition: opacity 0.2s;
+}
+
+/* BUGS.md · BUG-009: .reportes es una grilla; sin min-width: 0 sus tarjetas no se
+   achican por debajo del ancho de la tabla de datos y desbordan en celulares
+   (mismo mecanismo que el BUG-007). */
+.reportes > * {
+  min-width: 0;
+}
+
+/* Al actualizar, el reporte anterior queda a la vista atenuado (sin saltos). */
+.reportes--actualizando {
+  opacity: 0.5;
+}
+
+.etapa--solicitud { background: var(--etapa-1); }
+.etapa--aprobacion { background: var(--etapa-2); }
+.etapa--gestionRh { background: var(--etapa-3); }
+.etapa--finalizada { background: var(--etapa-4); }
+
+/* Indicadores (números destacados) */
+.indicadores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 16px;
+}
+
+.indicador {
+  display: grid;
+  gap: 2px;
+  align-content: start; /* el número queda a la misma altura en todas las tarjetas */
+}
+
+.indicador__etiqueta {
+  font-size: 0.9rem;
+  color: var(--color-texto-suave);
+}
+
+.indicador__valor {
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+/* Gráfico de barras horizontales */
+.grafico-barras {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.grafico-barras__fila {
+  display: grid;
+  grid-template-columns: minmax(120px, 30%) minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.grafico-barras__etiqueta {
+  display: grid;
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
+.grafico-barras__detalle {
+  color: var(--color-texto-suave);
+  font-size: 0.8rem;
+}
+
+/* La pista arranca en una línea base fina; la barra crece desde ahí. */
+.grafico-barras__pista {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  border-left: 1px solid var(--grafico-eje);
+  min-width: 0;
+}
+
+/* Ancho = proporción del máximo, dejando lugar para el valor escrito al final. */
+.grafico-barras__barra {
+  display: flex;
+  gap: 2px;
+  height: 20px;
+  width: calc(var(--proporcion) * (100% - 5.5rem));
+  flex: 0 0 auto;
+}
+
+.grafico-barras__segmento {
+  min-width: 3px;
+  height: 100%;
+  cursor: default;
+  transition: filter 0.15s;
+}
+
+/* Extremo redondeado de 4 px; la base (contra la línea) queda recta. */
+.grafico-barras__segmento:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.grafico-barras__segmento:hover,
+.grafico-barras__segmento:focus-visible {
+  filter: brightness(1.15);
+  outline: 2px solid var(--color-texto);
+  outline-offset: 1px;
+}
+
+.grafico-barras__valor {
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .grafico-barras__fila {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}
+
+/* Tooltip de los gráficos */
+.tooltip {
+  position: fixed;
+  z-index: 20;
+  display: grid;
+  gap: 2px;
+  max-width: 260px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--color-texto);
+  color: #ffffff;
+  font-size: 0.85rem;
+  pointer-events: none;
+  box-shadow: var(--sombra);
+}
+
+.tooltip span {
+  color: #d1d5db;
+}
+
+/* Tabla de datos de cada gráfico (alternativa accesible) */
+.datos-grafico {
+  margin-top: 16px;
+}
+
+.datos-grafico summary {
+  cursor: pointer;
+  color: var(--color-primario);
+  font-size: 0.9rem;
+}
+
+.datos-grafico .tabla-contenedor {
+  margin-top: 8px;
+}
+
+.tabla .numero {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Series de la carga por usuario (categóricas, con leyenda) */
+.serie--vistas { background: var(--serie-1); }
+.serie--nuevas { background: var(--serie-2); }
+
+.leyenda {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 0.85rem;
+  color: var(--color-texto-suave);
+}
+
+.leyenda li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* La muestra repite la forma de la marca: un rectángulo, como las barras. */
+.leyenda__muestra {
+  width: 14px;
+  height: 10px;
+  border-radius: 2px;
 }

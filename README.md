@@ -15,17 +15,23 @@ Prueba técnica para Bprosys.
 | 2 | Flujo completo de una solicitud con historial | ✅ |
 | 3 | Bandeja (pendientes / enviadas / nuevas, filtros, orden, búsqueda) y control de campos por rol | ✅ |
 | 4 | Mantenimiento de usuarios y roles | ✅ |
-| 5 | Reportes de gestión | ⏳ |
+| 5 | Reportes de gestión | ✅ |
 | 6 | Diseño final, pruebas por rol, deploy y documentación | ⏳ |
 
 ## Qué se puede hacer hoy
 
 - **Iniciador:** crear solicitudes (6 tipos de permiso, con días máximos y adjunto obligatorio según el tipo), adjuntar archivos, agregar notas, cancelar mientras no fue aprobada y corregir y reenviar una solicitud devuelta.
 - **Supervisor:** aprobar, devolver (con motivo obligatorio) o rechazar las solicitudes de su equipo.
-- **RH:** completar la gestión de las solicitudes aprobadas cargando la referencia de liquidación y los días descontados, o rechazarla (asignadas por reparto rotativo). Ve todas las solicitudes de la empresa.
-- **Admin:** ve todas las solicitudes de la empresa y gestiona usuarios y roles (ver abajo).
+- **RH:** completar la gestión de las solicitudes aprobadas cargando la referencia de liquidación y los días descontados, o rechazarla (asignadas por reparto rotativo). Ve todas las solicitudes de la empresa y los reportes.
+- **Admin:** ve todas las solicitudes de la empresa y los reportes, y gestiona usuarios y roles (ver abajo).
 - **Todos:** una **bandeja** con pestañas *Pendientes*, *Nuevas* (sin abrir) y *Enviadas* (y *Todas* para RH y admin), con contadores, búsqueda (sin tildes ni mayúsculas), filtros por estado, etapa, tipo y rango de fechas, y orden. En el detalle ven la etapa, los adjuntos y el historial completo.
 - **Control de campos por rol:** cada campo del trámite es editable, de solo lectura u oculto según el rol, el estado y si el usuario es el asignado (`MATRIZ_CAMPOS`). Las reglas de Firestore exigen lo mismo para la edición.
+- **Reportes (RH y admin):**
+  - **Indicadores:** total de trámites, en curso, finalizados y tareas sin abrir.
+  - **Distribución de trámites por etapa:** gráfico de barras en el orden del proceso, con el detalle por estado.
+  - **Carga de tareas pendientes por usuario:** barras apiladas de ya vistas / nuevas, con el trámite más antiguo de cada bandeja.
+  - **Accesibilidad:** cada gráfico tiene su tabla de datos y un tooltip que funciona con el mouse y con el teclado.
+  - **Costo:** la distribución se cuenta en el servidor (`count()`), así que el reporte no se encarece cuando crece el histórico.
 - **Mantenimiento (admin):**
   - **Usuarios:** listado con búsqueda y filtros. **Alta** con contraseña inicial: la cuenta se crea en una segunda instancia de Firebase, así el admin no pierde su sesión. **Ficha** para editar nombre, rol, área y supervisor, dar de **baja** (lógica) o **reactivar**, y enviar el mail de cambio de contraseña.
   - **Bloqueos:** la baja y el cambio de rol se bloquean, con los motivos a la vista, mientras el usuario participe en trámites abiertos, sea supervisor de colaboradores activos, sea el último RH activo o sea el propio admin.
@@ -57,13 +63,16 @@ src/
     bandeja.js              Lógica PURA de la bandeja (pestañas, filtros, orden, búsqueda)
     gestionUsuarios.js      Lógica PURA del mantenimiento de usuarios (validaciones, bloqueos, filtros)
     gestionRoles.js         Lógica PURA de la gestión de roles (catálogo, roles faltantes)
+    reportes.js             Lógica PURA de los reportes (distribución por etapa, carga por usuario)
     solicitudesServicio.js  Casos de uso: bandeja, crear, detalle, acciones, notas, adjuntos
     usuariosServicio.js     Casos de uso del mantenimiento: listar, alta, edición, baja, reactivación
     rolesServicio.js        Casos de uso de la gestión de roles
+    reportesServicio.js     Caso de uso de los reportes (conteos en el servidor + trámites abiertos)
     catalogoRoles.js        Nombres de los roles en memoria (los elige el admin)
     authServicio.js         Sesión y perfil del usuario
-  ui/                       Router, componentes (marco, tabla, formulario de usuario), pantallas (login, bandeja,
-                            nueva solicitud, detalle, usuarios, alta, ficha, roles) y utilidades
+  ui/                       Router, componentes (marco, tabla, formulario de usuario, gráfico de barras), pantallas
+                            (login, bandeja, nueva solicitud, detalle, usuarios, alta, ficha, roles, reportes) y
+                            utilidades (HTML seguro, formatos, avisos, tooltip)
   styles/main.css
 firestore.rules             Reglas de seguridad
 firestore.indexes.json      Índices compuestos (bandeja: asignadoA y participantes + fecha)
@@ -123,7 +132,7 @@ npm install
 | `npm run seed` | Crea o actualiza los 6 usuarios de prueba, los 4 roles y 10 solicitudes con historial y adjuntos. Es idempotente. No cambia la contraseña de los usuarios que ya existen (así no cierra sus sesiones). |
 | `npm run seed:restablecer-claves` | Igual que `seed`, pero además vuelve a poner la contraseña común a los usuarios existentes (cierra sus sesiones abiertas). |
 | `npm test` | Corre todos los tests (unitarios + reglas). |
-| `npm run test:unitarios` | Tests de la lógica pura: flujo, bandeja, mantenimiento de usuarios y gestión de roles. No necesita Firebase. |
+| `npm run test:unitarios` | Tests de la lógica pura: flujo, bandeja, mantenimiento de usuarios, gestión de roles y reportes. No necesita Firebase. |
 | `npm run test:reglas` | Tests de `firestore.rules` contra el emulador de Firestore (no toca la base real). |
 
 `seed` necesita la clave de cuenta de servicio en `scripts/serviceAccountKey.json`, que se descarga en la consola de Firebase: Configuración del proyecto → Cuentas de servicio → Generar nueva clave privada. **Ese archivo es secreto y está en `.gitignore`.**

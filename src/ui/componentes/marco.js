@@ -15,7 +15,7 @@
 
 import { cerrarSesion } from '../../services/authServicio.js';
 import { ROLES } from '../../config/constantes.js';
-import { RUTA_INICIO, RUTA_NUEVA_SOLICITUD, RUTA_ROLES, RUTA_USUARIOS } from '../router.js';
+import { RUTA_INICIO, RUTA_NUEVA_SOLICITUD, RUTA_REPORTES, RUTA_ROLES, RUTA_USUARIOS } from '../router.js';
 import { escaparHtml } from '../utils/html.js';
 import { nombreRol } from '../utils/formato.js';
 
@@ -27,11 +27,13 @@ import { nombreRol } from '../utils/formato.js';
  */
 export function dibujarMarco(contenedor, usuario) {
   // ⚠️ IMPORTANTE: cada rol ve solo los enlaces de lo que puede hacer: "Nueva solicitud"
-  // el iniciador y el mantenimiento el admin. (Es comodidad: el router, los servicios
+  // el iniciador, los reportes RH y admin, y el mantenimiento el admin. (Es comodidad: el router, los servicios
   // y firestore.rules igual lo controlan.)
   const enlacesDelRol = {
     [ROLES.INICIADOR]: [[RUTA_NUEVA_SOLICITUD, 'Nueva solicitud']],
+    [ROLES.RH]: [[RUTA_REPORTES, 'Reportes']],
     [ROLES.ADMIN]: [
+      [RUTA_REPORTES, 'Reportes'],
       [RUTA_USUARIOS, 'Usuarios'],
       [RUTA_ROLES, 'Roles'],
     ],
