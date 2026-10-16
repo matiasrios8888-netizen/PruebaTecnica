@@ -1170,3 +1170,19 @@ Construimos los reportes de gestión para RH y admin:
   - Desde `scripts/`, `npm run test:unitarios`.
   - En el navegador, recorrer las pantallas en claro y oscuro, y con la ventana angosta.
 - **Pendientes o dudas:** una prueba "falló" porque se cambió de pantalla en los milisegundos en que Firebase todavía no había informado la sesión. Una persona no puede hacerlo, y un link directo funciona porque el router espera a la sesión antes de resolver la primera ruta. No es un bug de la app.
+
+## 2026-10-15 – Fase 6 – Paso: pruebas con cada rol
+
+- **Qué hicimos:**
+  - Escribimos un guion de pruebas de punta a punta por rol, con 23 casos. Cada rol continúa el trámite del anterior: Ana pide, Carlos aprueba, Laura completa y Martín administra.
+  - Lo ejecutamos en el navegador sobre los datos del seed y documentamos el resultado en `docs/PRUEBAS.md`, junto con los tests automáticos y los controles de diseño y accesibilidad.
+- **Archivos creados o modificados:** `docs/PRUEBAS.md` (nuevo): tests automáticos (167), guion por rol con el resultado de cada caso, y controles de desborde, contraste, teclado y lectores de pantalla.
+- **Conceptos aprendidos:**
+  - **Prueba de punta a punta (end-to-end):** recorre la app como lo haría una persona, a través de todas las capas: pantalla, servicio, reglas y base. Complementa a los tests unitarios, que prueban piezas sueltas.
+  - **Cuando una prueba falla, primero se verifica lo esperado.** R4 esperaba "Sin abrir 2" y la app mostró 4. Al contar a mano, el 4 era correcto: SOL-0004, al reenviarse, vuelve como nueva. El error estaba en el guion. Corregir la app para que diera 2 habría sido introducir un bug.
+- **Comandos usados:**
+  - `npm run seed` antes y después del guion.
+  - Guion en el navegador: 23/23 correctos. Incluye el ingreso solo con teclado, el usuario dado de baja, validaciones de cada rol, redirecciones de rutas de otros roles, la gestión RH en solo lectura para el iniciador y la baja bloqueada.
+  - `npm test`: 94 unitarios y 73 de reglas, en verde.
+- **Cómo probarlo:** seguir las tablas de `docs/PRUEBAS.md` en orden, después de `npm run seed`.
+- **Pendientes o dudas:** el deploy en Vercel es el paso siguiente.
