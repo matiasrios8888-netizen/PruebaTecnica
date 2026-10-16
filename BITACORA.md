@@ -1057,3 +1057,132 @@ Construimos los reportes de gestión para RH y admin:
 - **Gráficos:** están hechos en HTML y CSS sin librerías, siguiendo una guía de visualización de datos. Las paletas se validaron con un script de contraste y daltonismo, cada gráfico tiene su tabla de datos y el tooltip funciona con el teclado.
 - **Calidad:** la lógica está en un módulo puro con tests, y los tests de reglas comprueban que un supervisor no puede hacer estas consultas. Durante la fase apareció un desborde en celulares (BUG-009), que se corrigió en la misma rama antes del merge, con una medición automática en 7 anchos.
 - **Resultado:** 164 tests en verde.
+
+---
+
+## 2026-10-15 – Fase 6 – Paso: base visual del diseño final (claro y oscuro)
+
+- **Qué hicimos:** rehicimos la base visual siguiendo un plan de diseño propio para esta app: una herramienta interna que usan todos los colaboradores, también desde el celular.
+  - **Tipografía:** Atkinson Hyperlegible Next, diseñada para leerse bien en cualquier condición. El cero con barra es parte de esa legibilidad.
+  - **Encabezado:** en azul tinta, con el ícono de la app (un calendario con una tilde), el nombre y el rol del usuario.
+  - **Paneles:** planos con borde fino. Antes todo era una tarjeta con la misma sombra; ahora la sombra queda para lo que flota (avisos y tooltip).
+  - **Títulos:** el de cada pantalla va sobre el fondo, sin panel.
+  - **Modo oscuro:** sigue la configuración del sistema, con los colores de los gráficos validados también para fondo oscuro.
+  - **Colores con significado:** el naranja marca "nueva / sin abrir" en la bandeja, igual que en el gráfico de carga.
+  - **Arreglos:**
+    - había dos `<main>` anidados;
+    - cada pantalla tiene su título de pestaña ("Bandeja – Permisos", "SOL-0004 – Permisos");
+    - foco visible para el teclado;
+    - se respeta la preferencia de menos movimiento;
+    - los bordes de los campos tienen contraste suficiente.
+- **Archivos creados o modificados:**
+  - `index.html`: `<div id="app">` en vez de `<main>`, la tipografía, el ícono, la descripción y el color de la barra del navegador en el celular.
+  - `favicon.svg` (nuevo): el ícono de la app.
+  - `src/styles/main.css`:
+    - variables de color para claro y oscuro (sin colores escritos a mano en los componentes);
+    - tipografía y foco visible;
+    - encabezado en grilla: escritorio en una fila; en el celular, las secciones abajo y bajando de línea;
+    - paneles planos, `.tarjeta--titulo`, botones y campos;
+    - "Nueva" en naranja;
+    - colores de los gráficos en oscuro.
+  - `src/ui/componentes/marco.js`: el encabezado nuevo (`ICONO_APP`, el nombre y el rol en dos líneas).
+  - `src/ui/router.js`: la opción `titulo` de cada ruta y `ponerTitulo()`.
+  - `src/main.js`: el título de cada pantalla.
+  - Pantallas:
+    - detalle y ficha: título con el dato cargado;
+    - bandeja, roles, reportes y ficha: título sin panel;
+    - bandeja: subtítulo según el rol, en vez de repetir el nombre.
+- **Conceptos aprendidos:**
+  - **Variables de diseño (tokens):** los colores están definidos una sola vez. El modo oscuro solo redefine esas variables dentro de `@media (prefers-color-scheme: dark)`; los componentes no cambian.
+  - **Un solo `<main>` por página:** los lectores de pantalla usan `<main>` para saltar al contenido. Si hay dos anidados, ese atajo no sirve.
+  - **Contraste de los controles (WCAG 1.4.11):** el borde de un campo tiene que tener 3:1 contra el fondo para que se vea dónde escribir.
+  - **Contenido oculto que no se nota:** un menú que se desplaza de costado con la barra oculta esconde opciones. En el celular, mejor que los enlaces bajen de línea.
+- **Comandos usados:**
+  - `node scripts/validate_palette.js … --mode dark --surface "#17202b"`: las etapas (escala) y la carga (dos series) pasan también en oscuro.
+  - Prueba en el navegador:
+    - título "Bandeja – Permisos", la tipografía cargada y un solo `<main>`;
+    - capturas en claro y oscuro;
+    - los números de solicitud ya no se cortan;
+    - sin desborde en 390 y 320 px y los cuatro enlaces del admin visibles en el celular;
+    - sin errores en la consola.
+- **Cómo probarlo:** Live Server (Ctrl + F5). Para ver el modo oscuro, activarlo en la configuración del sistema operativo (o en las herramientas de desarrollo del navegador: Rendering → prefers-color-scheme).
+- **Pendientes o dudas:** el login y el detalle (con el recorrido del trámite) se rediseñan en el paso siguiente.
+
+## 2026-10-15 – Fase 6 – Paso: login y recorrido del trámite
+
+- **Qué hicimos:** rediseñamos las dos pantallas donde aparece el elemento distintivo de la app, el recorrido del trámite.
+  - **Login en dos columnas:**
+    - a la izquierda, en azul tinta: el nombre de la app y los 3 pasos de un trámite, contados desde quien lo usa ("Pedís el permiso → Tu supervisor lo revisa → Recursos Humanos lo gestiona");
+    - a la derecha: el formulario y las **cuentas de demostración**, un botón por rol ("Entrar como Ana Gómez") que completa el formulario y lo envía.
+  - **Detalle:** las 4 etapas conectadas por una línea. Las hechas llevan ✓ y relleno, la actual un anillo, y las que faltan van en gris. En el celular se apilan en vertical.
+  - **Bugs:** se registró y corrigió el BUG-010 (el recorrido desbordaba a 320 px).
+- **Archivos creados o modificados:**
+  - `src/ui/pantallas/loginPantalla.js`: el login nuevo, con los pasos del trámite y las cuentas de demostración.
+  - `src/config/constantes.js`: `MOSTRAR_CUENTAS_DEMO`, `CONTRASENA_DEMO` y `CUENTAS_DEMO`.
+  - `src/ui/pantallas/detalleSolicitudPantalla.js`: el recorrido con estados (hecho, actual, pendiente) y texto para lectores de pantalla.
+  - `src/styles/main.css`: el login, el recorrido (horizontal, vertical en el celular y vertical en el login) y los botones de demostración.
+  - `BUGS.md` (BUG-010) y `DECISIONES.md` (decisión 28).
+- **Conceptos aprendidos:**
+  - **Especificidad de CSS:** dos reglas con la misma especificidad gana la que está más abajo en el archivo. `.boton { display: inline-block }` le ganaba a `.cuentas-demo__boton { display: grid }`; se resolvió con `.cuentas-demo .cuentas-demo__boton`.
+  - **`aria-current="step"`:** le dice al lector de pantalla cuál es el paso actual de una secuencia. Además, cada paso tiene un texto oculto ("hecha", "etapa actual", "pendiente"), así la información no depende solo del color.
+  - **`requestSubmit()`:** envía el formulario como si se apretara el botón, pasando por el mismo código que un ingreso a mano.
+- **Comandos usados:** prueba en el navegador:
+  - **Login:**
+    - título "Ingresar – Permisos" y un solo `<main>`;
+    - capturas en claro, oscuro y a 390 px (desborde 0);
+    - con una contraseña incorrecta aparece "Email o contraseña incorrectos." (el `400` en la consola es la OBS-001);
+    - "Entrar como Carlos Pérez" entra como el supervisor.
+  - **Detalle:**
+    - SOL-0004 (devuelta): Solicitud es la actual;
+    - SOL-0006: Gestión RH es la actual, con las dos anteriores hechas;
+    - SOL-0008 (completada): todas hechas;
+    - título de la pestaña "SOL-0004 – Permisos".
+  - **Desborde:** 0 en 8 anchos, después del BUG-010.
+- **Cómo probarlo:** abrir la app (Ctrl + F5) → el login nuevo → "Entrar como Laura Fernández" → abrir una solicitud de la bandeja y ver el recorrido. Achicar la ventana para ver cómo se apila.
+- **Pendientes o dudas:** queda la revisión visual de todas las pantallas (claro, oscuro y celular) y medir el contraste.
+
+## 2026-10-15 – Fase 6 – Paso: revisión visual completa y contraste medido
+
+- **Qué hicimos:**
+  - Recorrimos las 9 pantallas de la app con el rol que corresponde a cada una (bandeja, nueva solicitud, detalle con y sin acciones, usuarios, alta, ficha, roles y reportes). En cada una medimos el desborde en 1280, 390 y 320 px y revisamos capturas en claro, oscuro y celular.
+  - **Contraste medido:** calculamos el contraste WCAG de los 46 pares de texto y fondo que usa la app, en los dos modos. Todos cumplen AA, y quedó como **test automático**.
+  - Lo que se vio en las capturas se corrigió.
+- **Archivos creados o modificados:**
+  - `scripts/tests/contraste.test.mjs` (nuevo): lee las variables de color de `main.css` y verifica cada par (4,5:1 para texto y 3:1 para bordes de campos y foco). Se probó al revés: con un gris demasiado claro, el test falla e indica qué par no cumple.
+  - `scripts/package.json`: suma el test a `test:unitarios`.
+  - `src/styles/main.css`:
+    - los campos no se estiran cuando el vecino de la fila tiene una ayuda (`align-content: start`);
+    - aire arriba de un título de sección que sigue a otro contenido;
+    - filtros de a dos por fila desde 390 px;
+    - botones de acción del mismo ancho;
+    - el botón del selector de archivos con el estilo de la app.
+- **Conceptos aprendidos:**
+  - **Contraste WCAG:** la relación entre la luminancia del texto y la del fondo. 4,5:1 es el mínimo para texto normal y 3:1 para lo que no es texto (bordes, foco). Se calcula con una fórmula, no a ojo.
+  - **`align-content: start` en una grilla:** sin esto, una fila de la grilla reparte su alto sobrante entre los elementos y un campo se estira para igualar a su vecino.
+  - **`::file-selector-button`:** permite darle estilo al botón del `<input type="file">` sin reemplazar el control nativo, que sigue siendo accesible.
+- **Comandos usados:**
+  - Script de contraste con el validador de la guía: 46/46 pares en AA.
+  - `npm run test:unitarios`: 94 tests (los 91 anteriores más 3 de contraste).
+  - Prueba en el navegador:
+    - 9 pantallas × 3 anchos, todas con desborde 0, y el título de pestaña correcto en cada una.
+    - Después de los arreglos: en la ficha, "Nombre" y "Email" quedan a la misma altura (43 px); los 3 botones de acción miden 196 px; a 390 px los filtros ocupan 366 px de alto, la mitad que antes.
+- **Cómo probarlo:**
+  - Desde `scripts/`, `npm run test:unitarios`.
+  - En el navegador, recorrer las pantallas en claro y oscuro, y con la ventana angosta.
+- **Pendientes o dudas:** una prueba "falló" porque se cambió de pantalla en los milisegundos en que Firebase todavía no había informado la sesión. Una persona no puede hacerlo, y un link directo funciona porque el router espera a la sesión antes de resolver la primera ruta. No es un bug de la app.
+
+## 2026-10-15 – Fase 6 – Paso: pruebas con cada rol
+
+- **Qué hicimos:**
+  - Escribimos un guion de pruebas de punta a punta por rol, con 23 casos. Cada rol continúa el trámite del anterior: Ana pide, Carlos aprueba, Laura completa y Martín administra.
+  - Lo ejecutamos en el navegador sobre los datos del seed y documentamos el resultado en `docs/PRUEBAS.md`, junto con los tests automáticos y los controles de diseño y accesibilidad.
+- **Archivos creados o modificados:** `docs/PRUEBAS.md` (nuevo): tests automáticos (167), guion por rol con el resultado de cada caso, y controles de desborde, contraste, teclado y lectores de pantalla.
+- **Conceptos aprendidos:**
+  - **Prueba de punta a punta (end-to-end):** recorre la app como lo haría una persona, a través de todas las capas: pantalla, servicio, reglas y base. Complementa a los tests unitarios, que prueban piezas sueltas.
+  - **Cuando una prueba falla, primero se verifica lo esperado.** R4 esperaba "Sin abrir 2" y la app mostró 4. Al contar a mano, el 4 era correcto: SOL-0004, al reenviarse, vuelve como nueva. El error estaba en el guion. Corregir la app para que diera 2 habría sido introducir un bug.
+- **Comandos usados:**
+  - `npm run seed` antes y después del guion.
+  - Guion en el navegador: 23/23 correctos. Incluye el ingreso solo con teclado, el usuario dado de baja, validaciones de cada rol, redirecciones de rutas de otros roles, la gestión RH en solo lectura para el iniciador y la baja bloqueada.
+  - `npm test`: 94 unitarios y 73 de reglas, en verde.
+- **Cómo probarlo:** seguir las tablas de `docs/PRUEBAS.md` en orden, después de `npm run seed`.
+- **Pendientes o dudas:** el deploy en Vercel es el paso siguiente.

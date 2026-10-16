@@ -34,7 +34,7 @@ const cantidadDe = (n, singular, plural) => `${n} ${n === 1 ? singular : plural}
 export function renderizarReportes(contenedor, usuario) {
   const principal = dibujarMarco(contenedor, usuario);
   principal.innerHTML = `
-    <section class="tarjeta tarjeta--ancha">
+    <section class="tarjeta tarjeta--ancha tarjeta--titulo">
       <div class="cabecera-seccion">
         <div>
           <h1 class="titulo">Reportes de gestión</h1>

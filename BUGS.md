@@ -40,6 +40,7 @@ Todo bug o error detectado queda registrado acá, **aunque se corrija en el mome
 | BUG-007 | Desbordes horizontales: columna de acciones del detalle y tablas en celulares | Media | ✅ Resuelto | Fase 3 | `fix/BUG-007-desborde-columna-acciones` |
 | BUG-008 | El aviso de una acción seguía visible después de cerrar sesión | Baja | ✅ Resuelto | Fase 4 | `fix/BUG-008-avisos-entre-sesiones` |
 | BUG-009 | La pantalla de reportes desbordaba a lo ancho en celulares de 320 px | Media | ✅ Resuelto | Fase 5 | `feature/reportes` (antes del merge) |
+| BUG-010 | El recorrido del trámite desbordaba a lo ancho en celulares de 320 px | Media | ✅ Resuelto | Fase 6 | `feature/diseno-final` (antes del merge) |
 
 **Abiertos: 0**
 
@@ -141,6 +142,16 @@ Todo bug o error detectado queda registrado acá, **aunque se corrija en el mome
 - **Commit:** rama `feature/reportes`. Se corrigió en la misma rama porque el código todavía no había llegado a `main` (regla de `CLAUDE.md`).
 - **Test de regresión:** medición automática del desborde horizontal en 7 anchos (1440, 1024, 800, 520, 390, 360 y 320 px), con la tabla abierta: todos en 0.
 - **Lección:** cada contenedor nuevo que sea una grilla necesita `min-width: 0` en sus hijos. Desde ahora, la prueba de cada pantalla nueva incluye esta medición en varios anchos.
+
+
+### BUG-010 · El recorrido del trámite desbordaba a lo ancho en celulares de 320 px
+- **Detectado:** Fase 6, en la prueba del rediseño del detalle. Al medir el desborde horizontal: 20 px a 320 px.
+- **Severidad:** Media (aparece scroll horizontal en el detalle de cualquier solicitud).
+- **Cómo reproducir:** abrir el detalle de una solicitud en una ventana de 320 px.
+- **Causa:** el recorrido nuevo pone las 4 etapas en una fila. A 320 px cada paso tiene unos 60 px, y "Finalizada" mide más y no se puede cortar.
+- **Solución:** por debajo de 560 px, el recorrido se apila en vertical (círculo y nombre en una fila por etapa, unidos por una línea vertical).
+- **Commit:** rama `feature/diseno-final`. Se corrigió en la misma rama porque el código todavía no había llegado a `main`.
+- **Test de regresión:** medición automática del desborde en 8 anchos (1440, 1024, 800, 561, 560, 390, 360 y 320 px): todos en 0. Captura revisada a 320 px.
 
 ---
 

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Ícono de la app: un calendario con una tilde (un permiso aprobado). -->
+  <rect width="32" height="32" rx="7" fill="#12345a"/>
+  <g fill="none" stroke="#eef3f9" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="6" y="8" width="20" height="18" rx="3"/>
+    <path d="M6 13h20M12 5.5v4M20 5.5v4"/>
+  </g>
+  <path d="M11.5 19.5l3 3 6-6" fill="none" stroke="#86b6ef" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

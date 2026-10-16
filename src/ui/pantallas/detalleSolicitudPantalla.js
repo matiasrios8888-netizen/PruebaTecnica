@@ -45,7 +45,7 @@ import {
   TRANSICIONES,
 } from '../../config/constantes.js';
 import { dibujarMarco } from '../componentes/marco.js';
-import { RUTA_INICIO } from '../router.js';
+import { ponerTitulo, RUTA_INICIO } from '../router.js';
 import { escaparHtml } from '../utils/html.js';
 import { ejecutarConEstado } from '../utils/operaciones.js';
 import {
@@ -107,6 +107,7 @@ export async function renderizarDetalleSolicitud(contenedor, usuario, { id }) {
   if (!principal.isConnected) return;
 
   const { solicitud, historial, adjuntos, acciones, puedeAgregarSeguimiento, campos } = detalle;
+  ponerTitulo(solicitud.numero);
 
   principal.innerHTML = `
     ${htmlEncabezado(solicitud)}
@@ -134,12 +135,21 @@ export async function renderizarDetalleSolicitud(contenedor, usuario, { id }) {
 // -------------------------------------------------------------
 
 function htmlEncabezado(solicitud) {
+  // El recorrido del trámite: etapas hechas (✓), la actual resaltada y las que faltan.
+  // Un trámite finalizado tiene todas sus etapas hechas.
   const indiceActual = ORDEN_ETAPAS.indexOf(solicitud.etapaActual);
+  const finalizado = solicitud.etapaActual === ETAPAS.FINALIZADA;
   const pasos = ORDEN_ETAPAS.map((etapa, i) => {
-    const marca = i < indiceActual ? '✔ ' : i === indiceActual ? '● ' : '';
-    const clase = i === indiceActual ? 'etapas__paso etapas__paso--actual' : 'etapas__paso';
-    return `<li class="${clase}">${marca}${escaparHtml(nombreEtapa(etapa))}</li>`;
-  }).join('<li aria-hidden="true" class="etapas__separador">→</li>');
+    const estado = i < indiceActual || finalizado ? 'hecho' : i === indiceActual ? 'actual' : 'pendiente';
+    const marca = estado === 'hecho' ? '✓' : String(i + 1);
+    const textoEstado = { hecho: 'hecha', actual: 'etapa actual', pendiente: 'pendiente' }[estado];
+    return `
+      <li class="recorrido__paso recorrido__paso--${estado}" ${estado === 'actual' ? 'aria-current="step"' : ''}>
+        <span class="recorrido__marca" aria-hidden="true">${marca}</span>
+        <span class="recorrido__nombre">${escaparHtml(nombreEtapa(etapa))}</span>
+        <span class="solo-lectores">(${textoEstado})</span>
+      </li>`;
+  }).join('');
 
   const esperando = solicitud.asignadoA
     ? `Esperando a <strong>${escaparHtml(solicitud.asignadoNombre)}</strong> (${escaparHtml(nombreRol(solicitud.rolAsignado))})`
@@ -154,9 +164,7 @@ function htmlEncabezado(solicitud) {
         </div>
         <span class="${claseEstado(solicitud.estadoActual)}">${escaparHtml(nombreEstado(solicitud.estadoActual))}</span>
       </div>
-      <ol aria-label="Etapas del trámite" class="etapas">
-        ${pasos}
-      </ol>
+      <ol aria-label="Recorrido del trámite" class="recorrido">${pasos}</ol>
     </section>`;
 }
 

@@ -24,6 +24,7 @@
  * @property {(contenedor: HTMLElement, usuario: import('../data/modelos.js').Usuario|null, parametros: Record<string, string>) => void} renderizar
  * @property {boolean} publica - true = se puede ver sin sesión (solo el login).
  * @property {string[]|null} roles - Si se indica, solo esos roles pueden entrar.
+ * @property {string|null} titulo - Título de la pestaña del navegador (ej: "Bandeja").
  */
 
 export const RUTA_LOGIN = '#/login';
@@ -63,6 +64,20 @@ export const rutaBandeja = (pestana) => `#/bandeja/${encodeURIComponent(pestana)
  */
 export const rutaDetalle = (id) => `#/solicitudes/${encodeURIComponent(id)}`;
 
+/** Nombre de la app, al final del título de cada pestaña. */
+const NOMBRE_APP = 'Permisos';
+
+/**
+ * Pone el título de la pestaña del navegador ("Bandeja – Permisos").
+ * Lo usan el router al cambiar de pantalla y las pantallas que conocen un dato
+ * recién al cargar (por ejemplo, el número de la solicitud). Ayuda a quien usa
+ * lector de pantalla y a quien tiene varias pestañas abiertas.
+ * @param {string|null} titulo
+ */
+export function ponerTitulo(titulo) {
+  document.title = titulo ? `${titulo} – ${NOMBRE_APP}` : NOMBRE_APP;
+}
+
 /** @type {Ruta[]} */
 const rutas = [];
 
@@ -78,10 +93,10 @@ let pantallaActual = { hash: null, usuarioId: null };
  * ("#/solicitudes/nueva" gana sobre "#/solicitudes/:id").
  * @param {string} patron - Ej: "#/bandeja" o "#/solicitudes/:id".
  * @param {Ruta['renderizar']} renderizar
- * @param {{ publica?: boolean, roles?: string[] }} [opciones]
+ * @param {{ publica?: boolean, roles?: string[], titulo?: string }} [opciones]
  */
-export function registrarRuta(patron, renderizar, { publica = false, roles = null } = {}) {
-  rutas.push({ segmentos: patron.split('/'), renderizar, publica, roles });
+export function registrarRuta(patron, renderizar, { publica = false, roles = null, titulo = null } = {}) {
+  rutas.push({ segmentos: patron.split('/'), renderizar, publica, roles, titulo });
   rutas.sort((a, b) => cantidadParametros(a) - cantidadParametros(b));
 }
 
@@ -169,5 +184,6 @@ export function resolverRuta({ forzar = false } = {}) {
   pantallaActual = { hash, usuarioId };
 
   window.scrollTo(0, 0);
+  ponerTitulo(ruta.titulo);
   ruta.renderizar(contenedorApp, usuario, parametros);
 }

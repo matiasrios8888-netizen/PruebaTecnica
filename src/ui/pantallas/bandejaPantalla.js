@@ -35,7 +35,14 @@ import { dibujarMarco } from '../componentes/marco.js';
 import { htmlTablaSolicitudes, conectarFilas } from '../componentes/tablaSolicitudes.js';
 import { navegar, rutaBandeja, RUTA_NUEVA_SOLICITUD } from '../router.js';
 import { escaparHtml, htmlOpciones } from '../utils/html.js';
-import { nombreRol } from '../utils/formato.js';
+
+/** Qué encuentra cada rol en su bandeja (el nombre y el rol ya están en el encabezado). */
+const SUBTITULO_POR_ROL = {
+  [ROLES.INICIADOR]: 'Tus solicitudes de permiso y las que te devolvieron para corregir.',
+  [ROLES.SUPERVISOR]: 'Las solicitudes de tu equipo que esperan tu aprobación.',
+  [ROLES.RH]: 'Las solicitudes aprobadas que tenés que gestionar, y todas las de la empresa.',
+  [ROLES.ADMIN]: 'Todas las solicitudes de la empresa.',
+};
 
 /** Texto cuando una pestaña está vacía (sin filtros). */
 const TEXTO_VACIO = {
@@ -67,11 +74,11 @@ export async function renderizarBandeja(contenedor, usuario, { pestana = PESTANA
     usuario.rol === ROLES.INICIADOR ? `<a href="${RUTA_NUEVA_SOLICITUD}" class="boton boton--primario">Nueva solicitud</a>` : '';
 
   principal.innerHTML = `
-    <section class="tarjeta tarjeta--ancha">
+    <section class="tarjeta tarjeta--ancha tarjeta--titulo">
       <div class="cabecera-seccion">
         <div>
           <h1 class="titulo">Bandeja de tareas</h1>
-          <p class="subtitulo">${escaparHtml(usuario.nombre)} · ${escaparHtml(nombreRol(usuario.rol))}</p>
+          <p class="subtitulo">${escaparHtml(SUBTITULO_POR_ROL[usuario.rol] ?? '')}</p>
         </div>
         ${botonNueva}
       </div>

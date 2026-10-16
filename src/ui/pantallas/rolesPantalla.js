@@ -32,7 +32,7 @@ import { ejecutarConEstado } from '../utils/operaciones.js';
 export async function renderizarRoles(contenedor, usuario) {
   const principal = dibujarMarco(contenedor, usuario);
   principal.innerHTML = `
-    <section class="tarjeta tarjeta--ancha">
+    <section class="tarjeta tarjeta--ancha tarjeta--titulo">
       <h1 class="titulo">Roles</h1>
       <p class="subtitulo">
         Los 4 roles del flujo de permisos. Podés cambiar el nombre que se muestra y la descripción;
