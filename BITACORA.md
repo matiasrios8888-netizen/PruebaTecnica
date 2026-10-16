@@ -1186,3 +1186,34 @@ Construimos los reportes de gestión para RH y admin:
   - `npm test`: 94 unitarios y 73 de reglas, en verde.
 - **Cómo probarlo:** seguir las tablas de `docs/PRUEBAS.md` en orden, después de `npm run seed`.
 - **Pendientes o dudas:** el deploy en Vercel es el paso siguiente.
+
+## 2026-10-15 – Fase 6 – Paso: configuración del deploy en Vercel
+
+- **Qué hicimos:**
+  - Preparamos la publicación del sitio.
+    - **`vercel.json`:** cabeceras de seguridad y de caché. La principal es una **Content Security Policy (CSP)**, que le dice al navegador de dónde puede cargar código, estilos, fuentes y datos esta página: nuestro propio sitio, el SDK de Firebase, Google Fonts y las APIs de Firebase, nada más.
+    - **`.vercelignore`:** el sitio publica solo `index.html`, `favicon.svg`, `vercel.json` y `src/`; scripts, reglas, logs y documentación quedan afuera.
+  - Antes de publicar, probamos la CSP **localmente**, con un servidor temporal que aplica las mismas cabeceras que `vercel.json`.
+  - Creamos el proyecto en Vercel con la CLI (`permisos-bprosys`), que además conectó el repositorio de GitHub.
+- **Archivos creados o modificados:**
+  - `vercel.json` (nuevo):
+    - CSP;
+    - `X-Content-Type-Options: nosniff`;
+    - `Referrer-Policy`;
+    - `Permissions-Policy` (sin cámara, micrófono, ubicación ni pagos);
+    - HSTS;
+    - `Cache-Control: public, max-age=0, must-revalidate`, para que el navegador siempre revalide y nunca muestre una versión vieja (OBS-003).
+  - `.vercelignore`: suma la documentación (`*.md`, `docs/`) y la configuración del editor y de git.
+- **Conceptos aprendidos:**
+  - **CSP:** si alguien lograra inyectar código en la página (XSS), el navegador igual se negaría a ejecutar scripts de otros orígenes o a enviar datos a servidores no autorizados. Es una segunda línea de defensa, además de `escaparHtml`.
+  - **`frame-ancestors 'none'`:** impide que otro sitio meta la app dentro de un iframe para engañar al usuario (*clickjacking*).
+  - **`style-src 'unsafe-inline'`:** hace falta porque los gráficos usan atributos `style` (ancho de las barras). Inyectar estilos tiene mucho menos riesgo que inyectar scripts, que sí están restringidos.
+  - **Deploy continuo:** con el repositorio conectado, cada push a `main` publica la versión de producción y cada push a otra rama genera una versión de prueba (*preview*).
+- **Comandos usados:**
+  - Servidor local con las cabeceras de `vercel.json` y prueba en el navegador:
+    - login (Auth), bandeja (Firestore), reportes (consultas de conteo) y tipografía (Google Fonts);
+    - abrir un adjunto PDF en otra pestaña;
+    - resultado: **0 violaciones de la CSP y 0 errores** en la consola.
+  - `vercel link --yes --project permisos-bprosys`: crea el proyecto y lo conecta a GitHub. La línea que agregó al `.gitignore` se revirtió, porque `.vercel/` ya estaba ignorado.
+- **Cómo probarlo:** después del deploy, `curl -I <url>` muestra las cabeceras. En el navegador, la consola no tiene que mostrar "Refused to load…".
+- **Pendientes o dudas:** publicar en producción y verificar la app con los 4 roles en la URL pública.
