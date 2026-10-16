@@ -1,28 +1,88 @@
 /* =============================================================
-   Estilos de la aplicación.
-   El diseño final se trabaja en la Fase 6. Los colores y medidas
-   están en variables para cambiarlos en un solo lugar.
+   Estilos de la aplicación (diseño final, Fase 6 · DECISIONES.md #28).
+
+   Identidad:
+   - Tipografía única: Atkinson Hyperlegible Next (pensada para leerse bien
+     en cualquier pantalla: la usan todos los colaboradores).
+   - Azul tinta para la marca y el encabezado; azul de acción (el mismo de
+     los gráficos) para botones y enlaces.
+   - Un color, un significado: naranja = "nueva / sin abrir" en la bandeja y
+     en los reportes; los colores de estado solo se usan para estados.
+   - Paneles planos con borde fino; la sombra queda para lo que flota
+     (avisos, tooltip).
+   - Modo oscuro según la configuración del sistema operativo.
+
+   Todos los colores son variables: cambian en un solo lugar.
    ============================================================= */
 
 :root {
-  --color-fondo: #f3f5f9;
+  color-scheme: light dark;
+
+  --color-fondo: #eef1f5;
   --color-superficie: #ffffff;
-  --color-texto: #1f2937;
-  --color-texto-suave: #6b7280;
-  --color-primario: #1d4ed8;
-  --color-primario-hover: #1e40af;
-  --color-borde: #d1d5db;
-  --color-borde-suave: #e5e7eb;
-  --color-error: #b91c1c;
-  --color-error-fondo: #fef2f2;
-  --color-ok: #047857;
-  --color-ok-fondo: #ecfdf5;
-  --color-alerta: #b45309;
-  --color-alerta-fondo: #fffbeb;
-  --color-pendiente: #1d4ed8;
-  --color-pendiente-fondo: #eff6ff;
+  --color-superficie-hundida: #f5f7fa;
+  --color-texto: #1b2430;
+  --color-texto-suave: #556070;
+  --color-tinta: #12345a;
+  --color-sobre-tinta: #eef3f9;
+  --color-sobre-tinta-suave: #aebfd3;
+  --color-primario: #1c5cab;
+  --color-primario-hover: #184f95;
+  --color-sobre-primario: #ffffff;
+  --color-borde: #d5dbe3;
+  --color-borde-suave: #e4e8ee;
+  --color-borde-control: #7d8a9b; /* bordes de campos: 3:1 contra el fondo (WCAG 1.4.11) */
+  --color-nueva: #eb6834;
+  --color-sobre-nueva: #1f1208;
+  --color-error: #b42318;
+  --color-error-fondo: #fdecea;
+  --color-ok: #067647;
+  --color-ok-fondo: #e6f4ec;
+  --color-alerta: #93370d;
+  --color-alerta-fondo: #fef4e6;
+  --color-pendiente: #1c5cab;
+  --color-pendiente-fondo: #e8f0fb;
+  --color-tooltip-fondo: #1b2430;
+  --color-tooltip-texto: #ffffff;
+  --color-tooltip-suave: #c9d2dd;
+
+  --fuente: 'Atkinson Hyperlegible Next', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --radio: 10px;
-  --sombra: 0 4px 16px rgba(15, 23, 42, 0.08);
+  --radio-control: 8px;
+  --sombra-flotante: 0 10px 28px rgba(16, 32, 56, 0.18);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-fondo: #0f1620;
+    --color-superficie: #17202b;
+    --color-superficie-hundida: #1d2733;
+    --color-texto: #e6ebf1;
+    --color-texto-suave: #a3afbd;
+    --color-tinta: #0a1019;
+    --color-sobre-tinta: #e6ebf1;
+    --color-sobre-tinta-suave: #8fa0b5;
+    --color-primario: #6da7ec;
+    --color-primario-hover: #86b6ef;
+    --color-sobre-primario: #0b1a2e;
+    --color-borde: #2c3846;
+    --color-borde-suave: #232d39;
+    --color-borde-control: #6b7888;
+    --color-nueva: #eb6834;
+    --color-sobre-nueva: #1f1208;
+    --color-error: #ff8a80;
+    --color-error-fondo: #3a1b1d;
+    --color-ok: #5fd39a;
+    --color-ok-fondo: #12291f;
+    --color-alerta: #f7c46c;
+    --color-alerta-fondo: #33270f;
+    --color-pendiente: #8dbbf1;
+    --color-pendiente-fondo: #162a42;
+    --color-tooltip-fondo: #e6ebf1;
+    --color-tooltip-texto: #0f1620;
+    --color-tooltip-suave: #3c4756;
+    --sombra-flotante: 0 10px 28px rgba(0, 0, 0, 0.5);
+  }
 }
 
 * {
@@ -38,19 +98,49 @@
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--fuente);
+  font-size: 1rem;
+  line-height: 1.5;
   background: var(--color-fondo);
   color: var(--color-texto);
 }
 
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+}
+
 a {
   color: var(--color-primario);
+  text-underline-offset: 2px;
+}
+
+/* Foco visible y consistente para quien navega con teclado. */
+:focus-visible {
+  outline: 3px solid var(--color-primario);
+  outline-offset: 2px;
+}
+
+/* Quien pidió menos movimiento en su sistema no ve transiciones. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
 }
 
 /* ---------- Estructura ---------- */
 
 #app {
   min-height: 100vh;
+}
+
+/* "Cargando…" mientras Firebase informa si hay una sesión abierta. */
+.cargando-inicial {
+  margin: 0;
+  padding: 32px 24px;
+  color: var(--color-texto-suave);
 }
 
 /* Login: tarjeta centrada */
@@ -60,51 +150,125 @@ a {
   padding: 16px;
 }
 
+/* Encabezado en azul tinta: marca, secciones del rol y usuario.
+   Escritorio: todo en una fila. Celular: marca y usuario arriba, secciones abajo. */
 .encabezado {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: 'marca nav usuario';
   align-items: center;
-  gap: 12px 24px;
-  padding: 12px 24px;
-  background: var(--color-superficie);
-  border-bottom: 1px solid var(--color-borde-suave);
+  gap: 8px 28px;
+  padding: 10px 24px;
+  background: var(--color-tinta);
+  color: var(--color-sobre-tinta);
+}
+
+.encabezado :focus-visible {
+  outline-color: var(--color-sobre-tinta);
 }
 
 .encabezado__marca {
+  grid-area: marca;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 700;
-  font-size: 1.15rem;
-  color: var(--color-texto);
+  font-size: 1.2rem;
+  color: var(--color-sobre-tinta);
   text-decoration: none;
+}
+
+.encabezado__marca svg {
+  width: 26px;
+  height: 26px;
+  flex: none;
 }
 
 .nav {
+  grid-area: nav;
   display: flex;
-  gap: 16px;
-  flex: 1;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 .nav__enlace {
-  color: var(--color-texto-suave);
+  padding: 8px 12px;
+  border-radius: var(--radio-control);
+  color: var(--color-sobre-tinta-suave);
   text-decoration: none;
   font-weight: 600;
+  white-space: nowrap;
 }
 
+.nav__enlace:hover {
+  color: var(--color-sobre-tinta);
+}
+
+/* La sección actual se marca con un subrayado grueso, no solo con color. */
 .nav__enlace[aria-current='page'] {
-  color: var(--color-primario);
+  color: var(--color-sobre-tinta);
+  box-shadow: inset 0 -3px 0 var(--color-sobre-tinta);
+  border-radius: var(--radio-control) var(--radio-control) 0 0;
 }
 
 .encabezado__usuario {
+  grid-area: usuario;
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.encabezado__usuario small {
-  color: var(--color-texto-suave);
+.encabezado__persona {
+  display: grid;
+  text-align: right;
+  line-height: 1.25;
+}
+
+.encabezado__nombre {
+  font-weight: 600;
+}
+
+.encabezado__rol {
+  font-size: 0.8rem;
+  color: var(--color-sobre-tinta-suave);
+}
+
+.boton--sobre-tinta {
+  background: transparent;
+  border-color: var(--color-sobre-tinta-suave);
+  color: var(--color-sobre-tinta);
+}
+
+.boton--sobre-tinta:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 720px) {
+  .encabezado {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'marca usuario'
+      'nav nav';
+    padding: 10px 16px 0;
+  }
+
+  /* En el celular las secciones bajan de línea en vez de desplazarse de costado:
+     con la barra de desplazamiento oculta, una sección cortada no se notaría. */
+  .nav {
+    margin: 0 -8px;
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .encabezado__rol {
+    display: none;
+  }
 }
 
 .contenido {
-  max-width: 960px;
+  max-width: 1040px;
   margin: 0 auto;
   padding: 24px 16px 48px;
   display: grid;
@@ -113,12 +277,13 @@ a {
 
 /* ---------- Tarjetas y títulos ---------- */
 
+/* Panel plano con borde fino (sin sombra: la sombra es para lo que flota). */
 .tarjeta {
   width: 100%;
   max-width: 420px;
   background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
   border-radius: var(--radio);
-  box-shadow: var(--sombra);
   padding: 32px;
 }
 
@@ -127,13 +292,23 @@ a {
   padding: 24px;
 }
 
+/* El título de una pantalla va sobre el fondo, sin panel. */
+.tarjeta--titulo {
+  background: transparent;
+  border: 0;
+  padding: 8px 0 0;
+}
+
 .titulo {
   margin: 0 0 4px;
-  font-size: 1.5rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .titulo--seccion {
-  font-size: 1.1rem;
+  font-size: 1.15rem;
+  font-weight: 700;
   margin: 0 0 12px;
 }
 
@@ -185,9 +360,10 @@ a {
   font: inherit;
   font-weight: 400;
   padding: 10px 12px;
-  border: 1px solid var(--color-borde);
-  border-radius: 8px;
+  border: 1px solid var(--color-borde-control);
+  border-radius: var(--radio-control);
   background: var(--color-superficie);
+  color: var(--color-texto);
   width: 100%;
 }
 
@@ -205,7 +381,8 @@ a {
 .campo input:disabled,
 .campo select:disabled,
 .campo textarea:disabled {
-  background: var(--color-fondo);
+  background: var(--color-superficie-hundida);
+  border-color: var(--color-borde);
   color: var(--color-texto-suave);
 }
 
@@ -236,12 +413,16 @@ a {
   font: inherit;
   font-weight: 600;
   padding: 10px 16px;
-  border: 1px solid var(--color-borde);
-  border-radius: 8px;
+  border: 1px solid var(--color-borde-control);
+  border-radius: var(--radio-control);
   background: var(--color-superficie);
   color: var(--color-texto);
   text-decoration: none;
   cursor: pointer;
+}
+
+.boton:hover:not(:disabled) {
+  background: var(--color-superficie-hundida);
 }
 
 .boton--chico {
@@ -252,17 +433,22 @@ a {
 .boton--primario {
   background: var(--color-primario);
   border-color: var(--color-primario);
-  color: #fff;
+  color: var(--color-sobre-primario);
 }
 
 .boton--primario:hover:not(:disabled) {
   background: var(--color-primario-hover);
+  border-color: var(--color-primario-hover);
 }
 
 .boton--peligro {
-  background: var(--color-error);
+  background: var(--color-superficie);
   border-color: var(--color-error);
-  color: #fff;
+  color: var(--color-error);
+}
+
+.boton--peligro:hover:not(:disabled) {
+  background: var(--color-error-fondo);
 }
 
 .boton:disabled {
@@ -275,7 +461,7 @@ a {
 .mensaje-error {
   margin: 0;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: var(--radio-control);
   background: var(--color-error-fondo);
   color: var(--color-error);
   font-size: 0.9rem;
@@ -292,8 +478,8 @@ a {
 
 .aviso {
   padding: 12px 16px;
-  border-radius: 8px;
-  box-shadow: var(--sombra);
+  border-radius: var(--radio-control);
+  box-shadow: var(--sombra-flotante);
   font-weight: 600;
 }
 
@@ -344,8 +530,8 @@ a {
 }
 
 .etiqueta--nueva {
-  background: var(--color-primario);
-  color: #fff;
+  background: var(--color-nueva);
+  color: var(--color-sobre-nueva);
 }
 
 /* ---------- Datos (definiciones) ---------- */
@@ -392,13 +578,18 @@ a {
   font-weight: 600;
 }
 
+/* El número de solicitud ("SOL-0007") no se corta en el guion. */
+.tabla td:first-child {
+  white-space: nowrap;
+}
+
 /* Solo las filas que abren algo (bandeja, usuarios) tienen data-id y se pueden clickear. */
 .tabla tbody tr[data-id] {
   cursor: pointer;
 }
 
 .tabla tbody tr[data-id]:hover {
-  background: var(--color-fondo);
+  background: var(--color-superficie-hundida);
 }
 
 /* ---------- Historial (línea de tiempo) ---------- */
@@ -442,8 +633,8 @@ a {
 .historial__comentario {
   margin: 6px 0 0;
   padding: 8px 12px;
-  background: var(--color-fondo);
-  border-radius: 8px;
+  background: var(--color-superficie-hundida);
+  border-radius: var(--radio-control);
   white-space: pre-wrap;
 }
 
@@ -485,8 +676,8 @@ a {
 }
 
 .contador--destacado {
-  background: var(--color-primario);
-  color: #fff;
+  background: var(--color-nueva);
+  color: var(--color-sobre-nueva);
 }
 
 .filtros {
@@ -551,7 +742,7 @@ a {
 .mensaje-alerta {
   margin: 0;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: var(--radio-control);
   background: var(--color-alerta-fondo);
   color: var(--color-alerta);
   font-size: 0.9rem;
@@ -692,6 +883,21 @@ input[type='file'] {
   min-width: 0;
 }
 
+/* Modo oscuro: los mismos tonos, escalonados para el fondo oscuro (validados con el
+   validador de paletas contra #17202b). En la escala de etapas, lo más avanzado es
+   lo más claro: es lo que más contrasta con el fondo. */
+@media (prefers-color-scheme: dark) {
+  .reportes {
+    --etapa-1: #1c5cab;
+    --etapa-2: #3987e5;
+    --etapa-3: #6da7ec;
+    --etapa-4: #b7d3f6;
+    --serie-1: #3987e5;
+    --serie-2: #d95926;
+    --grafico-eje: #4a5666;
+  }
+}
+
 /* Al actualizar, el reporte anterior queda a la vista atenuado (sin saltos). */
 .reportes--actualizando {
   opacity: 0.5;
@@ -812,16 +1018,16 @@ input[type='file'] {
   gap: 2px;
   max-width: 260px;
   padding: 8px 10px;
-  border-radius: 8px;
-  background: var(--color-texto);
-  color: #ffffff;
+  border-radius: var(--radio-control);
+  background: var(--color-tooltip-fondo);
+  color: var(--color-tooltip-texto);
   font-size: 0.85rem;
   pointer-events: none;
-  box-shadow: var(--sombra);
+  box-shadow: var(--sombra-flotante);
 }
 
 .tooltip span {
-  color: #d1d5db;
+  color: var(--color-tooltip-suave);
 }
 
 /* Tabla de datos de cada gráfico (alternativa accesible) */

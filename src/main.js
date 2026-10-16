@@ -45,21 +45,21 @@ import { limpiarAvisos } from './ui/utils/avisos.js';
 
 const contenedor = document.getElementById('app');
 
-registrarRuta(RUTA_LOGIN, renderizarLogin, { publica: true });
-registrarRuta(RUTA_INICIO, renderizarBandeja); // #/bandeja → pestaña Pendientes
-registrarRuta(RUTA_BANDEJA_PESTANA, renderizarBandeja);
+registrarRuta(RUTA_LOGIN, renderizarLogin, { publica: true, titulo: 'Ingresar' });
+registrarRuta(RUTA_INICIO, renderizarBandeja, { titulo: 'Bandeja' }); // #/bandeja → pestaña Pendientes
+registrarRuta(RUTA_BANDEJA_PESTANA, renderizarBandeja, { titulo: 'Bandeja' });
 // ⚠️ IMPORTANTE: solo el iniciador crea solicitudes (también lo exigen el servicio y las reglas).
-registrarRuta(RUTA_NUEVA_SOLICITUD, renderizarNuevaSolicitud, { roles: [ROLES.INICIADOR] });
+registrarRuta(RUTA_NUEVA_SOLICITUD, renderizarNuevaSolicitud, { roles: [ROLES.INICIADOR], titulo: 'Nueva solicitud' });
 // Cualquier usuario logueado puede pedir un detalle; si no le corresponde verlo,
 // firestore.rules rechaza la lectura y la pantalla muestra el error.
-registrarRuta(RUTA_DETALLE_SOLICITUD, renderizarDetalleSolicitud);
+registrarRuta(RUTA_DETALLE_SOLICITUD, renderizarDetalleSolicitud, { titulo: 'Solicitud' });
 // 🔒 SEGURIDAD: el mantenimiento es solo del admin (también lo exigen los servicios y las reglas).
-registrarRuta(RUTA_USUARIOS, renderizarUsuarios, { roles: [ROLES.ADMIN] });
-registrarRuta(RUTA_NUEVO_USUARIO, renderizarAltaUsuario, { roles: [ROLES.ADMIN] });
-registrarRuta(RUTA_FICHA_USUARIO, renderizarFichaUsuario, { roles: [ROLES.ADMIN] });
-registrarRuta(RUTA_ROLES, renderizarRoles, { roles: [ROLES.ADMIN] });
+registrarRuta(RUTA_USUARIOS, renderizarUsuarios, { roles: [ROLES.ADMIN], titulo: 'Usuarios' });
+registrarRuta(RUTA_NUEVO_USUARIO, renderizarAltaUsuario, { roles: [ROLES.ADMIN], titulo: 'Nuevo usuario' });
+registrarRuta(RUTA_FICHA_USUARIO, renderizarFichaUsuario, { roles: [ROLES.ADMIN], titulo: 'Usuario' });
+registrarRuta(RUTA_ROLES, renderizarRoles, { roles: [ROLES.ADMIN], titulo: 'Roles' });
 // 🔒 SEGURIDAD: los reportes son de RH y admin (también lo exigen el servicio y las reglas).
-registrarRuta(RUTA_REPORTES, renderizarReportes, { roles: [...ROLES_VEN_REPORTES] });
+registrarRuta(RUTA_REPORTES, renderizarReportes, { roles: [...ROLES_VEN_REPORTES], titulo: 'Reportes' });
 
 iniciarRouter(contenedor, obtenerUsuarioActual);
 

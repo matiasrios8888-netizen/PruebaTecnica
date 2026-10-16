@@ -27,7 +27,7 @@ import {
 } from '../../services/usuariosServicio.js';
 import { dibujarMarco } from '../componentes/marco.js';
 import { htmlCamposUsuario, conectarCampoSupervisor, leerCamposUsuario } from '../componentes/formularioUsuario.js';
-import { rutaDetalle, rutaFichaUsuario, RUTA_USUARIOS } from '../router.js';
+import { ponerTitulo, rutaDetalle, rutaFichaUsuario, RUTA_USUARIOS } from '../router.js';
 import { escaparHtml } from '../utils/html.js';
 import { claseEstado, nombreEstado, nombreRol, nombreTipo } from '../utils/formato.js';
 import { ejecutarConEstado } from '../utils/operaciones.js';
@@ -62,6 +62,7 @@ export async function renderizarFichaUsuario(contenedor, admin, { id }) {
   if (!principal.isConnected) return;
 
   const { usuario } = ficha;
+  ponerTitulo(usuario.nombre);
   principal.innerHTML = `
     ${htmlEncabezado(usuario)}
     <div class="detalle-grilla">
@@ -90,7 +91,7 @@ function htmlEncabezado(usuario) {
     ? '<span class="etiqueta etiqueta--ok">Activo</span>'
     : '<span class="etiqueta etiqueta--neutra">Dado de baja</span>';
   return `
-    <section class="tarjeta tarjeta--ancha">
+    <section class="tarjeta tarjeta--ancha tarjeta--titulo">
       <p class="ayuda"><a href="${RUTA_USUARIOS}">← Usuarios</a></p>
       <div class="cabecera-seccion">
         <div>

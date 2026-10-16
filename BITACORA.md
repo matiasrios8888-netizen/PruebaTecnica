@@ -1057,3 +1057,53 @@ Construimos los reportes de gestión para RH y admin:
 - **Gráficos:** están hechos en HTML y CSS sin librerías, siguiendo una guía de visualización de datos. Las paletas se validaron con un script de contraste y daltonismo, cada gráfico tiene su tabla de datos y el tooltip funciona con el teclado.
 - **Calidad:** la lógica está en un módulo puro con tests, y los tests de reglas comprueban que un supervisor no puede hacer estas consultas. Durante la fase apareció un desborde en celulares (BUG-009), que se corrigió en la misma rama antes del merge, con una medición automática en 7 anchos.
 - **Resultado:** 164 tests en verde.
+
+---
+
+## 2026-10-15 – Fase 6 – Paso: base visual del diseño final (claro y oscuro)
+
+- **Qué hicimos:** rehicimos la base visual siguiendo un plan de diseño propio para esta app: una herramienta interna que usan todos los colaboradores, también desde el celular.
+  - **Tipografía:** Atkinson Hyperlegible Next, diseñada para leerse bien en cualquier condición. El cero con barra es parte de esa legibilidad.
+  - **Encabezado:** en azul tinta, con el ícono de la app (un calendario con una tilde), el nombre y el rol del usuario.
+  - **Paneles:** planos con borde fino. Antes todo era una tarjeta con la misma sombra; ahora la sombra queda para lo que flota (avisos y tooltip).
+  - **Títulos:** el de cada pantalla va sobre el fondo, sin panel.
+  - **Modo oscuro:** sigue la configuración del sistema, con los colores de los gráficos validados también para fondo oscuro.
+  - **Colores con significado:** el naranja marca "nueva / sin abrir" en la bandeja, igual que en el gráfico de carga.
+  - **Arreglos:**
+    - había dos `<main>` anidados;
+    - cada pantalla tiene su título de pestaña ("Bandeja – Permisos", "SOL-0004 – Permisos");
+    - foco visible para el teclado;
+    - se respeta la preferencia de menos movimiento;
+    - los bordes de los campos tienen contraste suficiente.
+- **Archivos creados o modificados:**
+  - `index.html`: `<div id="app">` en vez de `<main>`, la tipografía, el ícono, la descripción y el color de la barra del navegador en el celular.
+  - `favicon.svg` (nuevo): el ícono de la app.
+  - `src/styles/main.css`:
+    - variables de color para claro y oscuro (sin colores escritos a mano en los componentes);
+    - tipografía y foco visible;
+    - encabezado en grilla: escritorio en una fila; en el celular, las secciones abajo y bajando de línea;
+    - paneles planos, `.tarjeta--titulo`, botones y campos;
+    - "Nueva" en naranja;
+    - colores de los gráficos en oscuro.
+  - `src/ui/componentes/marco.js`: el encabezado nuevo (`ICONO_APP`, el nombre y el rol en dos líneas).
+  - `src/ui/router.js`: la opción `titulo` de cada ruta y `ponerTitulo()`.
+  - `src/main.js`: el título de cada pantalla.
+  - Pantallas:
+    - detalle y ficha: título con el dato cargado;
+    - bandeja, roles, reportes y ficha: título sin panel;
+    - bandeja: subtítulo según el rol, en vez de repetir el nombre.
+- **Conceptos aprendidos:**
+  - **Variables de diseño (tokens):** los colores están definidos una sola vez. El modo oscuro solo redefine esas variables dentro de `@media (prefers-color-scheme: dark)`; los componentes no cambian.
+  - **Un solo `<main>` por página:** los lectores de pantalla usan `<main>` para saltar al contenido. Si hay dos anidados, ese atajo no sirve.
+  - **Contraste de los controles (WCAG 1.4.11):** el borde de un campo tiene que tener 3:1 contra el fondo para que se vea dónde escribir.
+  - **Contenido oculto que no se nota:** un menú que se desplaza de costado con la barra oculta esconde opciones. En el celular, mejor que los enlaces bajen de línea.
+- **Comandos usados:**
+  - `node scripts/validate_palette.js … --mode dark --surface "#17202b"`: las etapas (escala) y la carga (dos series) pasan también en oscuro.
+  - Prueba en el navegador:
+    - título "Bandeja – Permisos", la tipografía cargada y un solo `<main>`;
+    - capturas en claro y oscuro;
+    - los números de solicitud ya no se cortan;
+    - sin desborde en 390 y 320 px y los cuatro enlaces del admin visibles en el celular;
+    - sin errores en la consola.
+- **Cómo probarlo:** Live Server (Ctrl + F5). Para ver el modo oscuro, activarlo en la configuración del sistema operativo (o en las herramientas de desarrollo del navegador: Rendering → prefers-color-scheme).
+- **Pendientes o dudas:** el login y el detalle (con el recorrido del trámite) se rediseñan en el paso siguiente.

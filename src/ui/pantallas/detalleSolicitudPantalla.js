@@ -45,7 +45,7 @@ import {
   TRANSICIONES,
 } from '../../config/constantes.js';
 import { dibujarMarco } from '../componentes/marco.js';
-import { RUTA_INICIO } from '../router.js';
+import { ponerTitulo, RUTA_INICIO } from '../router.js';
 import { escaparHtml } from '../utils/html.js';
 import { ejecutarConEstado } from '../utils/operaciones.js';
 import {
@@ -107,6 +107,7 @@ export async function renderizarDetalleSolicitud(contenedor, usuario, { id }) {
   if (!principal.isConnected) return;
 
   const { solicitud, historial, adjuntos, acciones, puedeAgregarSeguimiento, campos } = detalle;
+  ponerTitulo(solicitud.numero);
 
   principal.innerHTML = `
     ${htmlEncabezado(solicitud)}

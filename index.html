@@ -4,13 +4,23 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Permisos – Bprosys</title>
-    <!-- Ícono vacío: evita el error 404 de favicon.ico hasta el diseño final (Fase 6) -->
-    <link rel="icon" href="data:," />
+    <meta name="description" content="Solicitud y aprobación de permisos de los colaboradores." />
+    <meta name="theme-color" content="#12345a" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+
+    <!-- Tipografía: Atkinson Hyperlegible Next (Google Fonts). Si no carga, se usa la del sistema. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&display=swap"
+    />
     <link rel="stylesheet" href="./src/styles/main.css" />
   </head>
   <body>
-    <!-- Contenedor donde src/main.js dibuja la pantalla actual -->
-    <main id="app">Cargando…</main>
+    <!-- Contenedor donde src/main.js dibuja la pantalla actual. Es un <div>: el
+         <main> lo pone cada pantalla (hay uno solo por página, por accesibilidad). -->
+    <div id="app"><p class="cargando-inicial">Cargando…</p></div>
 
     <!-- type="module" habilita import/export nativos del navegador (sin bundler) -->
     <script type="module" src="./src/main.js"></script>
