@@ -277,3 +277,23 @@ Registro de las decisiones importantes del proyecto: qué decidimos, qué altern
   - Seguir la configuración del sistema operativo evita sumar estado y pantallas.
   - Las cuentas de demostración no son secretos: son datos de prueba y su contraseña ya está publicada. El botón ahorra copiar y pegar a quien evalúa la app, y en una instalación real se apaga con un valor.
 - **Límite conocido:** la tipografía se carga desde Google Fonts. Si no carga, se usa la del sistema, sin romper nada.
+
+## 29. Deploy en Vercel conectado a GitHub, con cabeceras de seguridad
+
+- **Decisión:**
+  - Proyecto de Vercel conectado al repositorio: `main` publica producción y las demás ramas generan *previews*.
+  - **Qué se publica:** `.vercelignore` deja solo los archivos del sitio.
+  - **Cabeceras de `vercel.json`:**
+    - una Content Security Policy que permite únicamente el propio sitio, el SDK de Firebase (gstatic), Google Fonts y las APIs de Firebase (Firestore, Identity Toolkit, Secure Token);
+    - `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy`, `Permissions-Policy` y HSTS;
+    - `Cache-Control: max-age=0, must-revalidate`.
+  - **Prueba previa:** la CSP se probó antes de publicar, con un servidor local que aplica las mismas cabeceras.
+- **Alternativas:**
+  - Firebase Hosting.
+  - Subir los archivos a mano en cada cambio.
+  - Publicar sin CSP.
+- **Por qué:**
+  - Vercel era parte del pedido. Conectarlo a GitHub hace que publicar sea consecuencia de integrar a `main`, la misma regla que ya usábamos: `main` es lo que se publica.
+  - La CSP es una segunda defensa contra la inyección de código (XSS): aunque alguien lograra meter HTML, el navegador no ejecutaría scripts de otros orígenes ni mandaría datos a servidores no autorizados.
+  - La revalidación del caché resuelve la OBS-003: después de un deploy, nadie se queda con módulos viejos.
+- **Límite conocido:** `style-src` permite estilos en línea (`'unsafe-inline'`), porque los gráficos dibujan el ancho de las barras con atributos `style`. Inyectar estilos tiene mucho menos riesgo que inyectar scripts, que sí están restringidos.

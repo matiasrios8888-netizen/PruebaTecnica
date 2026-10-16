@@ -168,6 +168,8 @@ Al cambiar de usuario, el SDK de Firestore cierra y vuelve a abrir su conexión 
 ### OBS-003 · El navegador muestra una versión vieja de la app después de un cambio
 Los navegadores guardan en caché los módulos JavaScript. En desarrollo: Live Server recarga solo al guardar; si no, recargar con **Ctrl + F5**. En producción: verificar en la Fase 6 que Vercel sirva los archivos con revalidación (`Cache-Control: max-age=0, must-revalidate`).
 
+**Verificado en la Fase 6:** `vercel.json` fija `Cache-Control: public, max-age=0, must-revalidate` para todo el sitio, y `curl -I https://permisos-bprosys.vercel.app/` lo confirma. El navegador puede guardar los archivos, pero los revalida en cada carga, así que después de un deploy nadie se queda con una versión vieja.
+
 ### OBS-004 · (Entorno) git no podía autenticarse con GitHub
 La configuración global de git (`~/.gitconfig`) apuntaba a un `gh.exe` que ya no existía (carpeta temporal de otro proyecto). Se resolvió en la Fase 1 con `gh auth login` y `gh auth setup-git`.
 
