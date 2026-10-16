@@ -254,3 +254,26 @@ Registro de las decisiones importantes del proyecto: qué decidimos, qué altern
   - Los contadores precalculados obligarían a tocar cada transición y sus reglas, y suman un punto donde los números se pueden desincronizar.
   - Ninguna de las dos consultas necesita índices compuestos, ni cambios en las reglas: RH y admin ya pueden leer todas las solicitudes.
 - **Límite conocido:** las consultas de conteo y la de abiertos se hacen casi al mismo tiempo, pero no en una transacción. Si alguien aprueba un trámite justo en ese instante, los dos reportes pueden diferir en 1. La pantalla muestra la hora del reporte y tiene un botón para actualizarlo.
+
+## 28. Diseño final: identidad propia, modo oscuro y cuentas de demostración en el login
+
+- **Decisión:**
+  - **Identidad pensada para esta app:** una herramienta interna que usan todos los colaboradores, también desde el celular.
+    - Tipografía única: Atkinson Hyperlegible Next, diseñada para la máxima legibilidad.
+    - Azul tinta para la marca y el encabezado; el azul de acción es el mismo de los gráficos.
+    - Paneles planos con borde fino (la sombra solo para lo que flota).
+    - Un color, un significado: el naranja es "nueva / sin abrir" en la bandeja y en los reportes.
+  - **El elemento distintivo es el recorrido del trámite.** En el login explica cómo funciona la app; en el detalle muestra en qué etapa está cada solicitud.
+  - **Modo oscuro** según la configuración del sistema, con variables de color y los gráficos validados para el fondo oscuro.
+  - **Cuentas de demostración en el login:** un botón por rol, que se puede apagar con `MOSTRAR_CUENTAS_DEMO`.
+- **Alternativas:**
+  - Un kit de componentes genérico (Bootstrap, Tailwind UI).
+  - Mantener el diseño funcional de las fases anteriores.
+  - Un interruptor manual de tema.
+  - Dejar las credenciales solo en el README.
+- **Por qué:**
+  - Un kit genérico hace que la app se parezca a cualquier otra.
+  - Las variables de color permiten el modo oscuro sin tocar los componentes.
+  - Seguir la configuración del sistema operativo evita sumar estado y pantallas.
+  - Las cuentas de demostración no son secretos: son datos de prueba y su contraseña ya está publicada. El botón ahorra copiar y pegar a quien evalúa la app, y en una instalación real se apaga con un valor.
+- **Límite conocido:** la tipografía se carga desde Google Fonts. Si no carga, se usa la del sistema, sin romper nada.

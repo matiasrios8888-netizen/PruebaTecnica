@@ -1107,3 +1107,36 @@ Construimos los reportes de gestión para RH y admin:
     - sin errores en la consola.
 - **Cómo probarlo:** Live Server (Ctrl + F5). Para ver el modo oscuro, activarlo en la configuración del sistema operativo (o en las herramientas de desarrollo del navegador: Rendering → prefers-color-scheme).
 - **Pendientes o dudas:** el login y el detalle (con el recorrido del trámite) se rediseñan en el paso siguiente.
+
+## 2026-10-15 – Fase 6 – Paso: login y recorrido del trámite
+
+- **Qué hicimos:** rediseñamos las dos pantallas donde aparece el elemento distintivo de la app, el recorrido del trámite.
+  - **Login en dos columnas:**
+    - a la izquierda, en azul tinta: el nombre de la app y los 3 pasos de un trámite, contados desde quien lo usa ("Pedís el permiso → Tu supervisor lo revisa → Recursos Humanos lo gestiona");
+    - a la derecha: el formulario y las **cuentas de demostración**, un botón por rol ("Entrar como Ana Gómez") que completa el formulario y lo envía.
+  - **Detalle:** las 4 etapas conectadas por una línea. Las hechas llevan ✓ y relleno, la actual un anillo, y las que faltan van en gris. En el celular se apilan en vertical.
+  - **Bugs:** se registró y corrigió el BUG-010 (el recorrido desbordaba a 320 px).
+- **Archivos creados o modificados:**
+  - `src/ui/pantallas/loginPantalla.js`: el login nuevo, con los pasos del trámite y las cuentas de demostración.
+  - `src/config/constantes.js`: `MOSTRAR_CUENTAS_DEMO`, `CONTRASENA_DEMO` y `CUENTAS_DEMO`.
+  - `src/ui/pantallas/detalleSolicitudPantalla.js`: el recorrido con estados (hecho, actual, pendiente) y texto para lectores de pantalla.
+  - `src/styles/main.css`: el login, el recorrido (horizontal, vertical en el celular y vertical en el login) y los botones de demostración.
+  - `BUGS.md` (BUG-010) y `DECISIONES.md` (decisión 28).
+- **Conceptos aprendidos:**
+  - **Especificidad de CSS:** dos reglas con la misma especificidad gana la que está más abajo en el archivo. `.boton { display: inline-block }` le ganaba a `.cuentas-demo__boton { display: grid }`; se resolvió con `.cuentas-demo .cuentas-demo__boton`.
+  - **`aria-current="step"`:** le dice al lector de pantalla cuál es el paso actual de una secuencia. Además, cada paso tiene un texto oculto ("hecha", "etapa actual", "pendiente"), así la información no depende solo del color.
+  - **`requestSubmit()`:** envía el formulario como si se apretara el botón, pasando por el mismo código que un ingreso a mano.
+- **Comandos usados:** prueba en el navegador:
+  - **Login:**
+    - título "Ingresar – Permisos" y un solo `<main>`;
+    - capturas en claro, oscuro y a 390 px (desborde 0);
+    - con una contraseña incorrecta aparece "Email o contraseña incorrectos." (el `400` en la consola es la OBS-001);
+    - "Entrar como Carlos Pérez" entra como el supervisor.
+  - **Detalle:**
+    - SOL-0004 (devuelta): Solicitud es la actual;
+    - SOL-0006: Gestión RH es la actual, con las dos anteriores hechas;
+    - SOL-0008 (completada): todas hechas;
+    - título de la pestaña "SOL-0004 – Permisos".
+  - **Desborde:** 0 en 8 anchos, después del BUG-010.
+- **Cómo probarlo:** abrir la app (Ctrl + F5) → el login nuevo → "Entrar como Laura Fernández" → abrir una solicitud de la bandeja y ver el recorrido. Achicar la ventana para ver cómo se apila.
+- **Pendientes o dudas:** queda la revisión visual de todas las pantallas (claro, oscuro y celular) y medir el contraste.

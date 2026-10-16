@@ -191,6 +191,28 @@ export const PERMISOS_POR_ROL = Object.freeze({
 });
 
 // -------------------------------------------------------------
+// Cuentas de demostración (login)
+// -------------------------------------------------------------
+
+/**
+ * El login ofrece un botón por rol para entrar con las cuentas de demostración,
+ * así quien evalúa la app la recorre sin copiar credenciales (DECISIONES.md #28).
+ * 🔒 SEGURIDAD: no son secretos: son las cuentas del script de datos de prueba
+ * (scripts/datosPrueba.mjs) y su contraseña está publicada en el README. En una
+ * instalación real, MOSTRAR_CUENTAS_DEMO va en false (y esas cuentas no existen).
+ */
+export const MOSTRAR_CUENTAS_DEMO = true;
+
+export const CONTRASENA_DEMO = 'Bprosys2026!';
+
+export const CUENTAS_DEMO = Object.freeze([
+  Object.freeze({ email: 'iniciador@bprosys.test', nombre: 'Ana Gómez', rol: ROLES.INICIADOR }),
+  Object.freeze({ email: 'supervisor@bprosys.test', nombre: 'Carlos Pérez', rol: ROLES.SUPERVISOR }),
+  Object.freeze({ email: 'rh@bprosys.test', nombre: 'Laura Fernández', rol: ROLES.RH }),
+  Object.freeze({ email: 'admin@bprosys.test', nombre: 'Martín Sosa', rol: ROLES.ADMIN }),
+]);
+
+// -------------------------------------------------------------
 // Usuarios (mantenimiento)
 // -------------------------------------------------------------
 
