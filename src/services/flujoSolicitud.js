@@ -8,7 +8,8 @@
  *   - qué acciones puede ejecutar un usuario sobre una solicitud;
  *   - validar una acción y calcular qué cambia (campos nuevos + evento del historial);
  *   - a quién se asigna la tarea (incluido el reparto rotativo de RH);
- *   - validar los datos de una solicitud, las notas y los archivos adjuntos.
+ *   - validar los datos de una solicitud, las notas y los archivos adjuntos;
+ *   - ordenar el historial para mostrarlo.
  *
  *   Es PURO: no usa Firebase, el DOM ni la fecha del sistema. Recibe datos y
  *   devuelve datos. Por eso lo usan tanto la app (solicitudesServicio.js) como
@@ -523,4 +524,28 @@ export function construirEventoAdjunto(solicitud, usuario, nombreArchivo) {
     throw new ErrorAplicacion('No podés adjuntar archivos a esta solicitud.', 'seguimientoNoPermitido');
   }
   return construirEvento(usuario, ACCIONES_HISTORIAL.ADJUNTO_AGREGADO, null, nombreArchivo);
+}
+
+// -------------------------------------------------------------
+// Historial
+// -------------------------------------------------------------
+
+/**
+ * 📝 TRAZABILIDAD: ordena el historial del más viejo al más nuevo.
+ *
+ * Los eventos que se guardan en una misma escritura (al crear una solicitud:
+ * "Creó la solicitud" y un "Adjuntó un archivo" por cada archivo) reciben la
+ * MISMA hora del servidor, y ante ese empate Firestore los devuelve en el
+ * orden de su id, que es aleatorio. Por eso, con la misma hora, el evento
+ * principal va antes que los de sus adjuntos (BUGS.md · BUG-011).
+ *
+ * @param {EventoHistorial[]} eventos - Como los devuelve Firestore (fecha = Timestamp).
+ * @returns {EventoHistorial[]} Un arreglo nuevo y ordenado; el original no cambia.
+ */
+export function ordenarHistorial(eventos) {
+  // Sin fecha (una escritura local que todavía no confirmó el servidor) va al final.
+  const milisegundos = (evento) => evento.fecha?.toMillis?.() ?? Number.POSITIVE_INFINITY;
+  const esAdjunto = (evento) => (evento.accion === ACCIONES_HISTORIAL.ADJUNTO_AGREGADO ? 1 : 0);
+  // sort es estable: dos adjuntos con la misma hora conservan el orden recibido.
+  return [...eventos].sort((a, b) => milisegundos(a) - milisegundos(b) || esAdjunto(a) - esAdjunto(b));
 }
