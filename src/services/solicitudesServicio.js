@@ -39,6 +39,7 @@ import {
   construirEventoAdjunto,
   construirEventoNota,
   formatearNumeroSolicitud,
+  ordenarHistorial,
   puedeAgregarSeguimiento,
   accesoACampos,
   validarArchivoAdjunto,
@@ -183,7 +184,8 @@ export async function obtenerDetalle(id) {
 
     return {
       solicitud,
-      historial,
+      // 📝 TRAZABILIDAD: con un orden explícito, no el que desempata Firestore (BUGS.md · BUG-011).
+      historial: ordenarHistorial(historial),
       adjuntos,
       acciones: accionesDisponibles(solicitud, usuario),
       puedeAgregarSeguimiento: puedeAgregarSeguimiento(solicitud, usuario),

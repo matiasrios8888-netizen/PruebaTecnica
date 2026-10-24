@@ -41,6 +41,7 @@ Todo bug o error detectado queda registrado acá, **aunque se corrija en el mome
 | BUG-008 | El aviso de una acción seguía visible después de cerrar sesión | Baja | ✅ Resuelto | Fase 4 | `fix/BUG-008-avisos-entre-sesiones` |
 | BUG-009 | La pantalla de reportes desbordaba a lo ancho en celulares de 320 px | Media | ✅ Resuelto | Fase 5 | `feature/reportes` (antes del merge) |
 | BUG-010 | El recorrido del trámite desbordaba a lo ancho en celulares de 320 px | Media | ✅ Resuelto | Fase 6 | `feature/diseno-final` (antes del merge) |
+| BUG-011 | El historial podía mostrar "Adjuntó un archivo" antes de "Creó la solicitud" | Media | ✅ Resuelto | Video (post Fase 6) | `fix/BUG-011-orden-historial` |
 
 **Abiertos: 0**
 
@@ -152,6 +153,17 @@ Todo bug o error detectado queda registrado acá, **aunque se corrija en el mome
 - **Solución:** por debajo de 560 px, el recorrido se apila en vertical (círculo y nombre en una fila por etapa, unidos por una línea vertical).
 - **Commit:** rama `feature/diseno-final`. Se corrigió en la misma rama porque el código todavía no había llegado a `main`.
 - **Test de regresión:** medición automática del desborde en 8 anchos (1440, 1024, 800, 561, 560, 390, 360 y 320 px): todos en 0. Captura revisada a 320 px.
+
+
+### BUG-011 · El historial podía mostrar "Adjuntó un archivo" antes de "Creó la solicitud"
+- **Detectado:** después de la Fase 6, grabando la demo del video. En dos corridas iguales el historial de SOL-0011 salió en órdenes distintos.
+- **Severidad:** Media (la trazabilidad muestra los pasos en un orden que no ocurrió; los datos están bien).
+- **Cómo reproducir:** crear una solicitud con un adjunto y abrir su historial varias veces con solicitudes nuevas: a veces "Adjuntó un archivo" aparece arriba de "Creó la solicitud".
+- **Causa:** `crearConNumero` guarda en la misma transacción el evento "creada" y el de cada adjunto, todos con `fecha: serverTimestamp()`. En una misma escritura, Firestore les da **la misma hora exacta**. `listarHistorial` ordena solo por `fecha`, y ante un empate Firestore desempata por el id del documento, que es aleatorio.
+- **Solución:** la función pura `ordenarHistorial` (`flujoSolicitud.js`) ordena por hora y, ante un empate, pone el evento principal antes que los de sus adjuntos. `obtenerDetalle` la aplica antes de devolver el historial. No cambian los datos guardados ni las reglas.
+- **Commit:** rama `fix/BUG-011-orden-historial`.
+- **Test de regresión:** 4 tests de `ordenarHistorial` en `flujoSolicitud.test.mjs`. El principal llega desordenado a propósito, como lo devuelve Firestore cuando el id del adjunto es "menor". `npm test`: 98 + 73 en verde.
+- **Prueba manual:** con la app de la rama en local, se crearon 3 solicitudes con 2 adjuntos cada una, y las 3 mostraron "Creó la solicitud → Adjuntó un archivo → Adjuntó un archivo". Después se restablecieron los datos de prueba.
 
 ---
 

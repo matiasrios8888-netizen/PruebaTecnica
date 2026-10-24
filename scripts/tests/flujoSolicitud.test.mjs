@@ -30,6 +30,7 @@ import {
   construirEventoNota,
   accesoACampos,
   validarGestionRh,
+  ordenarHistorial,
 } from '../../src/services/flujoSolicitud.js';
 import { ErrorAplicacion } from '../../src/services/errores.js';
 
@@ -346,5 +347,39 @@ describe('validarGestionRh', () => {
 
   test('rechaza referencias de más de 40 caracteres', () => {
     lanzaError(() => validarGestionRh({ referenciaRh: 'X'.repeat(41), diasDescontados: 1 }, 3), 'referenciaLarga');
+  });
+});
+
+// -------------------------------------------------------------
+// Orden del historial (BUGS.md · BUG-011)
+// -------------------------------------------------------------
+
+describe('ordenarHistorial', () => {
+  /** Imita un Timestamp de Firestore: solo hace falta toMillis(). */
+  const evento = (accion, milisegundos, comentario = null) => ({ accion, comentario, fecha: { toMillis: () => milisegundos } });
+  const resumen = (eventos) => eventos.map((e) => `${e.accion}${e.comentario ? `:${e.comentario}` : ''}`);
+
+  test('con la misma hora, "creada" va antes que sus adjuntos aunque Firestore los devuelva al revés', () => {
+    // Así llegan cuando el id aleatorio del adjunto es "menor" que el de la creación.
+    const deFirestore = [evento('adjuntoAgregado', 1000, 'b.pdf'), evento('adjuntoAgregado', 1000, 'a.pdf'), evento('creada', 1000)];
+    assert.deepEqual(resumen(ordenarHistorial(deFirestore)), ['creada', 'adjuntoAgregado:b.pdf', 'adjuntoAgregado:a.pdf']);
+  });
+
+  test('ordena por hora, del más viejo al más nuevo', () => {
+    const deFirestore = [evento('aprobada', 3000), evento('creada', 1000), evento('notaAgregada', 2000)];
+    assert.deepEqual(resumen(ordenarHistorial(deFirestore)), ['creada', 'notaAgregada', 'aprobada']);
+  });
+
+  test('un adjunto posterior sigue después de los eventos anteriores', () => {
+    const deFirestore = [evento('adjuntoAgregado', 2000, 'nuevo.pdf'), evento('aprobada', 3000), evento('creada', 1000)];
+    assert.deepEqual(resumen(ordenarHistorial(deFirestore)), ['creada', 'adjuntoAgregado:nuevo.pdf', 'aprobada']);
+  });
+
+  test('no modifica el arreglo recibido y deja al final un evento todavía sin hora', () => {
+    const sinHora = { accion: 'notaAgregada', comentario: null, fecha: null };
+    const deFirestore = [sinHora, evento('creada', 1000)];
+    const ordenado = ordenarHistorial(deFirestore);
+    assert.deepEqual(resumen(ordenado), ['creada', 'notaAgregada']);
+    assert.equal(deFirestore[0], sinHora);
   });
 });

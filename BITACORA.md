@@ -1272,3 +1272,32 @@ Construimos una aplicación web de solicitud y aprobación de permisos, sin fram
   - un guion de pruebas por rol;
   - 10 bugs registrados y corregidos con ramas `fix/`;
   - 29 decisiones técnicas documentadas con sus alternativas.
+
+---
+
+## 2026-10-24 – Después de la Fase 6 – Corrección: BUG-011 (orden del historial)
+
+- **Qué hicimos:** grabando la demo del video, el historial de la misma solicitud salió en dos órdenes distintos: a veces "Adjuntó un archivo" aparecía antes que "Creó la solicitud". Seguimos el flujo de BUGS.md:
+  1. registrar el bug;
+  2. crear una rama desde `main`;
+  3. corregir;
+  4. testear;
+  5. integrar.
+
+  Ahora el servicio ordena el historial con un criterio explícito.
+- **Archivos creados o modificados:**
+  - `src/services/flujoSolicitud.js`: nueva función pura `ordenarHistorial`.
+  - `src/services/solicitudesServicio.js`: `obtenerDetalle` devuelve el historial ordenado.
+  - `scripts/tests/flujoSolicitud.test.mjs`: 4 tests de regresión.
+  - `BUGS.md`: BUG-011.
+  - `docs/PRUEBAS.md` y `README.md`: el total de tests pasa de 167 a 171.
+- **Conceptos aprendidos:**
+  - **`serverTimestamp()` en una misma escritura:** todos los documentos de una transacción reciben la misma hora del servidor, la del momento en que se confirma la escritura. No sirve para ordenar dentro de un mismo lote.
+  - **Desempate de Firestore:** con `orderBy('fecha')`, dos documentos con la misma fecha se devuelven en el orden de su id. Los ids automáticos son aleatorios, así que ese orden también lo es.
+  - **Sort estable:** `Array.prototype.sort` conserva el orden original de los elementos que el comparador considera iguales.
+- **Comandos usados:**
+  - `git switch -c fix/BUG-011-orden-historial`, creada desde `main` al día.
+  - `npm test`: 98 + 73 en verde.
+  - Prueba con la app local: 3 solicitudes con 2 adjuntos cada una, las 3 con el orden correcto. Después, `npm run seed` para restablecer los datos.
+- **Cómo probarlo:** crear una solicitud de Enfermedad con dos adjuntos y abrirla. El historial tiene que empezar siempre con "Creó la solicitud".
+- **Pendientes o dudas:** dos adjuntos subidos juntos siguen el orden que devuelve Firestore entre ellos. Es aceptable, porque ocurrieron en el mismo instante.

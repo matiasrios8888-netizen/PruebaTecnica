@@ -13,14 +13,14 @@ Hay tres niveles:
 
 | Suite | Archivo | Tests | Qué cubre |
 |---|---|---|---|
-| Flujo | `scripts/tests/flujoSolicitud.test.mjs` | 38 | Transiciones por rol, validaciones, control de campos, reparto de RH |
+| Flujo | `scripts/tests/flujoSolicitud.test.mjs` | 42 | Transiciones por rol, validaciones, control de campos, reparto de RH, orden del historial |
 | Bandeja | `scripts/tests/bandeja.test.mjs` | 16 | Pestañas por rol, búsqueda sin tildes, filtros y orden |
 | Usuarios | `scripts/tests/gestionUsuarios.test.mjs` | 21 | Validación de datos, bloqueos de baja y cambio de rol, reactivación |
 | Roles | `scripts/tests/gestionRoles.test.mjs` | 7 | Catálogo, roles faltantes, permisos de fábrica |
 | Reportes | `scripts/tests/reportes.test.mjs` | 9 | Distribución por etapa, carga por usuario |
 | Contraste | `scripts/tests/contraste.test.mjs` | 3 | Los 23 pares de texto y fondo cumplen WCAG AA, en claro y en oscuro |
 | Reglas | `scripts/tests/reglas.test.mjs` | 73 | `firestore.rules` contra el emulador: quién puede leer y escribir qué |
-| **Total** | | **167** | |
+| **Total** | | **171** | |
 
 ```bash
 cd scripts
